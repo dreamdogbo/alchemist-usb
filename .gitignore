@@ -1,0 +1,15 @@
+# Le dépôt ne contient AUCUN binaire : tout est téléchargé lors de la préparation d'une clé.
+# Zone de téléchargement / préparation (plusieurs Go)
+cache/
+# Journaux horodatés
+logs/
+# Fichiers parfois générés à côté des téléchargements
+*.part
+*.part.src
+*.iso
+*.img
+*.msi
+*.msix
+*.exe
+*.zip
+*.cab

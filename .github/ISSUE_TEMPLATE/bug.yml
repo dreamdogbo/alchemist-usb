@@ -1,0 +1,40 @@
+name: Signaler un bug
+description: Un comportement inattendu lors de la création de clé ou de l'installation d'un poste
+labels: [bug]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: Version du kit
+      description: Fichier VERSION ou bandeau des fenêtres (ex. 1.0.0)
+    validations:
+      required: true
+  - type: dropdown
+    id: etape
+    attributes:
+      label: Étape concernée
+      options:
+        - Création de la clé (Creer-Cle.bat / Build-Kit.ps1)
+        - Installation de Windows (Ventoy / modèle hors ligne)
+        - Installation du poste (Lancer.bat)
+        - Autre
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Ce qui s'est passé
+      description: Ce que vous avez fait, ce que vous attendiez, ce qui est arrivé.
+    validations:
+      required: true
+  - type: textarea
+    id: journal
+    attributes:
+      label: Extrait du journal
+      description: logs\build-*.log (création) ou C:\PostInstall\*.log (poste)
+      render: text
+  - type: input
+    id: env
+    attributes:
+      label: Environnement
+      description: Windows (version), PowerShell 5.1 ou 7, taille de la clé

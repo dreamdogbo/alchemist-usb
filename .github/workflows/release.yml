@@ -1,0 +1,37 @@
+name: Publication
+
+# Une étiquette vX.Y.Z (SemVer) publie automatiquement une GitHub Release
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Vérifier la cohérence VERSION / étiquette
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          file="$(head -n1 VERSION | tr -d '[:space:]')"
+          if [ "$tag" != "$file" ]; then echo "VERSION ($file) ≠ étiquette ($tag)"; exit 1; fi
+
+      - name: Notes de version (section du CHANGELOG)
+        run: |
+          v="${GITHUB_REF_NAME#v}"
+          awk -v v="$v" '$0 ~ "^## \\[" v "\\]" {f=1; next} f && /^## \[/ {exit} f' CHANGELOG.md > notes.md
+          echo "" >> notes.md
+          echo "**Installation** : télécharger l'archive ci-dessous, la décompresser, double-cliquer \`Creer-Cle.bat\`." >> notes.md
+
+      - name: Archive du kit
+        run: git archive --format=zip --prefix="kit-ventoy/" -o "kit-ventoy-${GITHUB_REF_NAME}.zip" HEAD
+
+      - name: Créer la release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" "kit-ventoy-${GITHUB_REF_NAME}.zip" --title "Kit Ventoy $GITHUB_REF_NAME" --notes-file notes.md

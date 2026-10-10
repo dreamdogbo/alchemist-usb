@@ -1,0 +1,27 @@
+name: Proposer une évolution
+description: Un logiciel, un profil, une langue ou une fonctionnalité à ajouter
+labels: [evolution]
+body:
+  - type: dropdown
+    id: type
+    attributes:
+      label: Type d'évolution
+      options:
+        - Ajouter un logiciel
+        - Nouveau profil (usage / système)
+        - Nouvelle langue
+        - Fonctionnalité
+    validations:
+      required: true
+  - type: textarea
+    id: besoin
+    attributes:
+      label: Besoin
+      description: À quoi cela servira, pour quels utilisateurs.
+    validations:
+      required: true
+  - type: input
+    id: source
+    attributes:
+      label: Source officielle (si logiciel)
+      description: Identifiant winget, dépôt GitHub officiel ou page de téléchargement de l'éditeur
