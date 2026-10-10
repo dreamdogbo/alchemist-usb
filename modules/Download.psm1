@@ -476,8 +476,8 @@ function Test-KitSignature {
         }
         'NotSigned' {
             if ($Required) { throw "$leaf n'est pas signé : impossible de vérifier son origine." }
-            Write-KitLog -Level WARN -Message "$leaf n'est pas signé numériquement (intégrité garantie par le SHA256 winget)."
-            return 'non signé (SHA256 winget vérifié)'
+            Write-KitLog -Level WARN -Message "$leaf n'est pas signé numériquement (intégrité garantie par le SHA256 publié)."
+            return 'non signé (SHA256 publié vérifié)'
         }
         { $_ -in @('HashMismatch', 'NotTrusted') } {
             throw "$leaf : signature numérique invalide ($status). Fichier refusé."
