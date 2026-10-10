@@ -239,17 +239,43 @@ fichier_paquet() {
   if [ "$FAMILLE" = "deb" ]; then apt-get install -y "$TMP/$nom.$ext"; else dnf install -y "$TMP/$nom.$ext"; fi
 }
 
-# URL du fichier d'une release GitHub STABLE correspondant au motif (regex)
+# Jeton GitHub facultatif (GITHUB_TOKEN) : évite la limite de 60 requêtes/heure de l'API
+github_auth() { if [ -n "${GITHUB_TOKEN:-}" ]; then printf '%s\n' -H "Authorization: Bearer $GITHUB_TOKEN"; fi; }
+
+# Étiquette de la dernière release STABLE : API GitHub, sinon redirection de /releases/latest (sans API)
+github_tag() {
+  local depot="$1" tag="" auth=()
+  mapfile -t auth < <(github_auth)
+  tag="$(curl -fsSL "${auth[@]}" "https://api.github.com/repos/$depot/releases/latest" 2>/dev/null \
+    | python3 -c 'import json,sys; d=json.load(sys.stdin); print("" if d.get("draft") or d.get("prerelease") else d["tag_name"])' 2>/dev/null || true)"
+  if [ -z "$tag" ]; then
+    tag="$(curl -fsSLI -o /dev/null -w '%{url_effective}' "https://github.com/$depot/releases/latest" 2>/dev/null | sed -n 's#.*/releases/tag/##p')"
+  fi
+  printf '%s\n' "$tag"
+}
+
+# URL du fichier d'une release GitHub STABLE correspondant au motif (regex) : API, sinon page des assets
 github_dernier() {
-  local depot="$1" motif="$2"
-  curl -fsSL "https://api.github.com/repos/$depot/releases/latest" | python3 -c '
+  local depot="$1" motif="$2" tag url auth=()
+  mapfile -t auth < <(github_auth)
+  url="$(curl -fsSL "${auth[@]}" "https://api.github.com/repos/$depot/releases/latest" 2>/dev/null | python3 -c '
 import json, re, sys
 data = json.load(sys.stdin)
 if data.get("draft") or data.get("prerelease"): sys.exit(1)
 for a in data.get("assets", []):
     if re.search(sys.argv[1], a["name"]):
         print(a["browser_download_url"]); break
-' "$motif"
+' "$motif" 2>/dev/null || true)"
+  if [ -z "$url" ]; then
+    tag="$(github_tag "$depot")"; [ -z "$tag" ] && return 1
+    url="$(curl -fsSL "https://github.com/$depot/releases/expanded_assets/$tag" 2>/dev/null | python3 -c '
+import re, sys
+for path in re.findall(r"href=\"(/[^\"]+/releases/download/[^\"]+)\"", sys.stdin.read()):
+    if re.search(sys.argv[1], path.rsplit("/", 1)[-1]):
+        print("https://github.com" + path); break
+' "$motif" || true)"
+  fi
+  [ -n "$url" ] && printf '%s\n' "$url"
 }
 
 # Installe le paquet d'une release GitHub (.deb ou .rpm selon la distribution)
@@ -483,7 +509,7 @@ comp_python() {
 
 comp_node() {
   local tag
-  tag="$(curl -fsSL https://api.github.com/repos/nvm-sh/nvm/releases/latest | python3 -c 'import json,sys; print(json.load(sys.stdin)["tag_name"])')"
+  tag="$(github_tag nvm-sh/nvm)"; [ -z "$tag" ] && { jaune "  nvm : version introuvable"; return 1; }
   en_utilisateur "export NVM_DIR=\"\$HOME/.nvm\"; [ -s \"\$NVM_DIR/nvm.sh\" ] || curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/$tag/install.sh | bash; . \"\$NVM_DIR/nvm.sh\"; nvm install --lts && nvm alias default 'lts/*' && corepack enable"
 }
 

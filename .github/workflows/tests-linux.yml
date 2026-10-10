@@ -29,6 +29,8 @@ jobs:
           }
 
       - name: Dernières versions stables Linux (sites officiels)
+        # Dépend de sites extérieurs : signalé sans bloquer la CI
+        continue-on-error: true
         shell: pwsh
         run: |
           Import-Module ./modules/Report.psm1, ./modules/Drive.psm1, ./modules/Download.psm1 -Force -DisableNameChecking
@@ -46,6 +48,8 @@ jobs:
       matrix:
         image: ['ubuntu:26.04', 'ubuntu:24.04', 'debian:trixie', 'fedora:latest', 'linuxmintd/mint22-amd64']
     container: ${{ matrix.image }}
+    env:
+      GITHUB_TOKEN: ${{ github.token }}
     steps:
       - name: Prérequis d'un poste de bureau (curl, python3, sudo)
         run: |

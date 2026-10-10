@@ -64,9 +64,32 @@ function Get-KitGitHubRelease {
         }
         catch {
             $last = $_.Exception.Message
+            # Limite de l'API GitHub atteinte (403/429) : repli immédiat sur les pages publiques
+            if ($last -match '403|429|rate limit') { break }
             if ($attempt -lt $script:MaxAttempts) { Start-Sleep -Seconds (3 * $attempt) }
         }
     }
+    # Repli sans API : étiquette via /releases/latest, fichiers via la page des assets (pas de SHA256
+    # publié dans ce cas : la signature de l'éditeur devient obligatoire en aval)
+    try {
+        $ri = Get-KitRemoteInfo -Url "https://github.com/$Repo/releases/latest" -Agent $script:PlainAgent
+        if ($ri.FinalUrl -match '/releases/tag/([^/?#]+)') {
+            $tag = [uri]::UnescapeDataString($Matches[1])
+            $html = Get-KitText -Url "https://github.com/$Repo/releases/expanded_assets/$tag"
+            foreach ($m in [regex]::Matches($html, 'href="(/[^"]+/releases/download/[^"]+)"')) {
+                $path = $m.Groups[1].Value
+                $name = [uri]::UnescapeDataString(($path -split '/')[-1])
+                if ($name -match $AssetPattern) {
+                    $url = 'https://github.com' + $path
+                    $len = -1.0
+                    try { $len = (Get-KitRemoteInfo -Url $url -Agent $script:PlainAgent).Length } catch { Write-Verbose 'Taille inconnue.' }
+                    Write-KitLog -Level WARN -Message "GitHub $Repo : API indisponible ($last), repli sur la page publique des releases."
+                    return [pscustomobject]@{ Version = $tag.TrimStart('v'); Url = $url; FileName = $name; Length = $len; Sha256 = '' }
+                }
+            }
+        }
+    }
+    catch { $last = "$last ; repli : $($_.Exception.Message)" }
     throw "GitHub $Repo : $last"
 }
 
