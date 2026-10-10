@@ -174,8 +174,12 @@ function Test-DejaInstalle {
     switch -Wildcard ($d) {
         'reg:*' { return [bool](@(Get-NomInstalle) -match $valeur) }
         'appx:*' {
-            $prov = @(Get-AppxProvisionedPackage -Online -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -eq $valeur })
-            $inst = @(Get-AppxPackage -AllUsers -Name $valeur -ErrorAction SilentlyContinue)
+            # Sans droits administrateur, ces commandes échouent : repli sur l'utilisateur courant
+            $prov = @()
+            try { $prov = @(Get-AppxProvisionedPackage -Online -ErrorAction Stop | Where-Object { $_.DisplayName -eq $valeur }) } catch { Write-Verbose 'AppX provisionnés illisibles (droits).' }
+            $inst = @()
+            try { $inst = @(Get-AppxPackage -AllUsers -Name $valeur -ErrorAction Stop) }
+            catch { $inst = @(Get-AppxPackage -Name $valeur -ErrorAction SilentlyContinue) }
             return ($prov.Count + $inst.Count) -gt 0
         }
         'c2r:*' {

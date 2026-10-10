@@ -26,7 +26,7 @@
     SettingsList  = 'Restore point, visible file extensions, no sleep on AC power, time zone, PDFs opened with Acrobat Reader, Windows updates (if Internet).'
     Install       = 'Install'
     LaunchTool    = 'Launch tool'
-    Drivers       = 'Drivers (SDIO)'
+    Drivers       = 'Drivers ▾'
     Logs          = 'Logs'
     Close         = 'Close'
     Ready         = 'Ready.'

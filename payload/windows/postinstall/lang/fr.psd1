@@ -26,7 +26,7 @@
     SettingsList  = 'Point de restauration, extensions de fichiers visibles, pas de veille sur secteur, fuseau horaire, PDF ouverts par Acrobat Reader, mises à jour Windows (si Internet).'
     Install       = 'Installer'
     LaunchTool    = 'Lancer l''outil'
-    Drivers       = 'Pilotes (SDIO)'
+    Drivers       = 'Pilotes ▾'
     Logs          = 'Journaux'
     Close         = 'Fermer'
     Ready         = 'Prêt.'

@@ -148,7 +148,8 @@ function Update-List {
         $lvi.Tag = $e
         $lvi.ImageKey = $(if ($e.Launcher) { 'tool' } elseif ($e.Installed) { 'ok' } elseif ($e.OnKey) { 'todo' } elseif ($e.WingetId -and $script:Etat.Internet) { 'online' } else { 'missing' })
         # Coché par défaut : installable automatiquement, pas encore installé, disponible
-        $lvi.Checked = (-not $e.Launcher) -and (-not $e.Installed) -and ($e.Mode -ne 'Manuel') -and ($e.OnKey -or ($e.WingetId -and $script:Etat.Internet))
+        # Coché par défaut seulement s'il est sur la clé (les éléments en ligne restent au choix)
+        $lvi.Checked = (-not $e.Launcher) -and (-not $e.Installed) -and ($e.Mode -ne 'Manuel') -and $e.OnKey
         if ($e.Installed) { $lvi.ForeColor = $theme.Muted }
         if ($e.Launcher) { $lvi.ForeColor = $theme.Tool }
         [void]$script:ItemList.Items.Add($lvi)
@@ -277,11 +278,11 @@ $script:ItemList.Add_DoubleClick({ $s = @($script:ItemList.SelectedItems); if ($
 $form.Controls.Add($script:ItemList)
 
 $btnAll = New-Object System.Windows.Forms.Button
-$btnAll.Text = (T 'CheckAll'); $btnAll.Location = New-Object System.Drawing.Point(18, 462); $btnAll.Size = New-Object System.Drawing.Size(110, 26); $btnAll.Anchor = 'Bottom,Left'
+$btnAll.Text = (T 'CheckAll'); $btnAll.Location = New-Object System.Drawing.Point(18, 462); $btnAll.Size = New-Object System.Drawing.Size(125, 28); $btnAll.Anchor = 'Bottom,Left'
 $btnAll.Add_Click({ foreach ($i in @($script:ItemList.Items)) { if ($i -and -not $i.Tag.Launcher) { $i.Checked = $true } } })
 $form.Controls.Add($btnAll)
 $btnNone = New-Object System.Windows.Forms.Button
-$btnNone.Text = (T 'CheckNone'); $btnNone.Location = New-Object System.Drawing.Point(134, 462); $btnNone.Size = New-Object System.Drawing.Size(120, 26); $btnNone.Anchor = 'Bottom,Left'
+$btnNone.Text = (T 'CheckNone'); $btnNone.Location = New-Object System.Drawing.Point(149, 462); $btnNone.Size = New-Object System.Drawing.Size(125, 28); $btnNone.Anchor = 'Bottom,Left'
 $btnNone.Add_Click({ foreach ($i in @($script:ItemList.Items)) { if ($i) { $i.Checked = $false } } })
 $form.Controls.Add($btnNone)
 
@@ -308,7 +309,7 @@ $btnTool.Text = (T 'LaunchTool'); $btnTool.Location = New-Object System.Drawing.
 $btnTool.Add_Click({ $s = @($script:ItemList.SelectedItems); $tag = $null; if ($s.Count -gt 0) { $tag = $s[0].Tag }; Start-Tool -Entry $tag })
 $form.Controls.Add($btnTool)
 $btnDrivers = New-Object System.Windows.Forms.Button
-$btnDrivers.Text = (T 'Drivers'); $btnDrivers.Location = New-Object System.Drawing.Point(672, 414); $btnDrivers.Size = New-Object System.Drawing.Size(180, 32)
+$btnDrivers.Text = (T 'Drivers'); $btnDrivers.Location = New-Object System.Drawing.Point(672, 414); $btnDrivers.Size = New-Object System.Drawing.Size(170, 32)
 # Menu « Pilotes » : page officielle du fabricant détecté, SDIO (clé), composants, Windows Update
 $driverMenu = New-Object System.Windows.Forms.ContextMenuStrip
 $pilotes = Get-Content -LiteralPath (Join-Path $here 'pilotes.json') -Raw -Encoding UTF8 | ConvertFrom-Json
@@ -330,11 +331,11 @@ foreach ($c in @($pilotes.Composants) + @($pilotes.Fabricants | Where-Object { $
 $btnDrivers.Add_Click({ $driverMenu.Show($btnDrivers, 0, $btnDrivers.Height) })
 $form.Controls.Add($btnDrivers)
 $btnLogs = New-Object System.Windows.Forms.Button
-$btnLogs.Text = (T 'Logs'); $btnLogs.Location = New-Object System.Drawing.Point(862, 414); $btnLogs.Size = New-Object System.Drawing.Size(90, 32)
+$btnLogs.Text = (T 'Logs'); $btnLogs.Location = New-Object System.Drawing.Point(850, 414); $btnLogs.Size = New-Object System.Drawing.Size(108, 32)
 $btnLogs.Add_Click({ if (-not (Test-Path 'C:\PostInstall')) { New-Item -ItemType Directory 'C:\PostInstall' | Out-Null }; Start-Process explorer.exe 'C:\PostInstall' })
 $form.Controls.Add($btnLogs)
 $btnClose = New-Object System.Windows.Forms.Button
-$btnClose.Text = (T 'Close'); $btnClose.Location = New-Object System.Drawing.Point(962, 414); $btnClose.Size = New-Object System.Drawing.Size(90, 32)
+$btnClose.Text = (T 'Close'); $btnClose.Location = New-Object System.Drawing.Point(964, 414); $btnClose.Size = New-Object System.Drawing.Size(88, 32)
 $btnClose.Add_Click({ $form.Close() })
 $form.Controls.Add($btnClose)
 $btnComplete = New-Object System.Windows.Forms.Button
