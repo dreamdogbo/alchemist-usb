@@ -224,14 +224,14 @@ kit-ventoy/
 
 ## Feuille de route
 
-- [x] **v1 Windows** : Windows 11 + Office/LibreOffice/ONLYOFFICE + logiciels + pilotes, hors ligne, fenêtres FR/EN.
-- [x] Multiboot : Ubuntu LTS, Linux Mint, Debian, Fedora (optionnels).
-- [ ] **Profils par usage** : bureautique, développement (VS Code, Git, Python, Node, Docker…), statistiques
-      (R, RStudio, Python data, JASP…), et profils Linux équivalents.
-- [ ] **Mise à jour de Ventoy** sur la clé depuis la release officielle (vérifiée), sans effacement (mode *Update*).
-- [ ] Noms lisibles dans le menu Ventoy (`menu_alias`) et persistance pour les systèmes Linux.
-- [ ] Packs de pilotes hors ligne sélectifs (réseau/chipset) pour SDIO.
-- [ ] Traduction complète des journaux techniques ; autres langues d'interface (ES, DE, PT…).
+- [x] **v1.0** : Windows 11 + Office/LibreOffice/ONLYOFFICE + logiciels + pilotes + ClamAV, hors ligne, fenêtres FR/EN, multiboot Linux.
+- [ ] **v1.1** : installer / mettre à jour **Ventoy** depuis l'assistant, puis tout le reste en une seule opération.
+- [ ] **v1.2** : profils par usage (bureautique, développement, statistiques, graphisme/vidéo).
+- [ ] **v2.0** : Linux de première classe (installation automatisée, profil développeur : Docker, VS Code, langages ;
+      Microsoft 365 sous Linux ; équivalents Adobe : Inkscape, GIMP/Krita, Kdenlive/DaVinci Resolve, PDFCraft).
+- [ ] **v2.1** : assistant de migration Windows → Linux.
+
+Détails : [ROADMAP.md](ROADMAP.md).
 
 ## Limites connues
 
