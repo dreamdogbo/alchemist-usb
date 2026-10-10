@@ -1,0 +1,26 @@
+<!--
+  office-config.xml — Configuration Office Deployment Tool (ODT)
+  Microsoft 365 Apps for enterprise, x64, français, Current Channel,
+  sans Teams, Publisher ni Access.
+
+  Ce même fichier sert :
+   - au téléchargement (Build-Kit.ps1 ajoute SourcePath="<cache>" à la volée) ;
+   - à l'installation sur le poste (copié tel quel en config.xml sur la clé :
+     sans SourcePath, setup.exe utilise le dossier Office\ situé à côté de lui,
+     et AllowCdnFallback permet de compléter depuis Internet si un fichier manque).
+-->
+<Configuration>
+  <Add OfficeClientEdition="64" Channel="Current" AllowCdnFallback="TRUE">
+    <Product ID="O365ProPlusRetail">
+      <Language ID="fr-fr" />
+      <ExcludeApp ID="Teams" />
+      <ExcludeApp ID="Publisher" />
+      <ExcludeApp ID="Access" />
+    </Product>
+  </Add>
+  <Updates Enabled="TRUE" Channel="Current" />
+  <RemoveMSI />
+  <Property Name="FORCEAPPSHUTDOWN" Value="TRUE" />
+  <Property Name="SharedComputerLicensing" Value="0" />
+  <Display Level="None" AcceptEULA="TRUE" />
+</Configuration>
