@@ -12,7 +12,7 @@
     Systeme      = 'Linux'
     Usage        = 'Bureautique'
     Ordre        = 1
-    Description  = 'Ubuntu LTS, Mint, Debian ou Fedora + Microsoft 365 web, ONLYOFFICE, LibreOffice, Chrome, Edge, PDFCraft, Zoom, sécurité, sauvegarde'
+    Description  = 'Ubuntu LTS, Mint, Debian ou Fedora + Microsoft 365 de bureau intégral (LinOffice), ONLYOFFICE, LibreOffice, Chrome, Edge, PDFCraft, Zoom, sécurité, sauvegarde'
     KitVersion   = '2.0'
     MarginMB     = 1024
     VolumeLabel  = 'Ventoy'
