@@ -1,0 +1,509 @@
+﻿<#
+.SYNOPSIS
+    Assistant graphique (fenêtre Windows) de préparation d'une clé Ventoy.
+
+.DESCRIPTION
+    Pour les non-experts : choix du type de clé (profil), détection de la clé Ventoy,
+    sélection des logiciels par cases à cocher, options (vérification des signatures,
+    sauvegarde des données de la clé, simulation), puis exécution de Build-Kit.ps1 avec
+    affichage du journal en direct.
+    Aucune logique de préparation n'est dupliquée ici : la fenêtre construit simplement la
+    ligne de commande de Build-Kit.ps1, qui reste utilisable seul.
+
+.EXAMPLE
+    Double-clic sur Creer-Cle.bat
+.EXAMPLE
+    powershell -ExecutionPolicy Bypass -File .\Assistant.ps1
+#>
+[Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification = 'Fonctions internes d''interface graphique')]
+[CmdletBinding()]
+param(
+    # Langue de l'interface (fichier lang\<code>.psd1). Défaut : langue de Windows, sinon fr.
+    [string] $Interface,
+    # Construit la fenêtre sans l'afficher (test automatique)
+    [switch] $TestSansAffichage,
+    # Avec -TestSansAffichage : enregistre une capture PNG de la fenêtre (documentation, tests)
+    [string] $Capture
+)
+
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+
+Add-Type -AssemblyName System.Windows.Forms
+Add-Type -AssemblyName System.Drawing
+[System.Windows.Forms.Application]::EnableVisualStyles()
+# Une erreur imprévue dans la fenêtre est écrite dans le journal au lieu d'afficher
+# la boîte « exception non gérée » de .NET
+[System.Windows.Forms.Application]::SetUnhandledExceptionMode([System.Windows.Forms.UnhandledExceptionMode]::CatchException)
+[System.Windows.Forms.Application]::add_ThreadException({
+        param($s, $e)
+        [void]$s
+        try { Add-LogLine -Line ('[ERROR] ' + $e.Exception.Message) } catch { Write-Verbose $e.Exception.Message }
+    })
+
+$kitRoot = $PSScriptRoot
+Import-Module (Join-Path $kitRoot 'modules\Report.psm1') -Force -DisableNameChecking
+Import-Module (Join-Path $kitRoot 'modules\Drive.psm1') -Force -DisableNameChecking
+Import-Module (Join-Path $kitRoot 'payload\windows\postinstall\KitUi.psm1') -Force -DisableNameChecking
+
+$script:Process = $null
+$script:LogPath = ''
+$script:LogPos = 0L
+$script:Profiles = @()
+$script:TotalLabel = $null
+$script:LogBox = $null
+$script:Restart = $false
+$script:LangCodes = @()
+
+# --------------------------------------------------------------------------- langue de l'interface
+$langDir = Join-Path $kitRoot 'lang'
+if (-not $Interface) { $Interface = ([Globalization.CultureInfo]::CurrentUICulture.TwoLetterISOLanguageName) }
+if (-not (Test-Path -LiteralPath (Join-Path $langDir "$Interface.psd1"))) { $Interface = 'fr' }
+$script:Lfr = Import-PowerShellDataFile -Path (Join-Path $langDir 'fr.psd1')
+$script:L = Import-PowerShellDataFile -Path (Join-Path $langDir "$Interface.psd1")
+
+function T {
+    <#
+    .SYNOPSIS
+        Texte traduit (repli sur le français si la clé manque dans la langue choisie).
+    #>
+    param([string] $Key)
+    if ($script:L.ContainsKey($Key)) { return $script:L[$Key] }
+    if ($script:Lfr.ContainsKey($Key)) { return $script:Lfr[$Key] }
+    return $Key
+}
+
+# --------------------------------------------------------------------------- utilitaires
+function New-Label {
+    <#
+    .SYNOPSIS
+        Crée une étiquette positionnée.
+    #>
+    param([string] $Text, [int] $X, [int] $Y, [int] $W = 120, [int] $H = 22, [switch] $Bold)
+    $l = New-Object System.Windows.Forms.Label
+    $l.Text = $Text; $l.Location = New-Object System.Drawing.Point($X, $Y); $l.Size = New-Object System.Drawing.Size($W, $H)
+    if ($Bold) { $l.Font = New-Object System.Drawing.Font('Segoe UI', 9, [System.Drawing.FontStyle]::Bold) }
+    return $l
+}
+
+function Add-LogLine {
+    <#
+    .SYNOPSIS
+        Ajoute une ligne colorée selon son niveau dans la zone de journal.
+    #>
+    param([string] $Line)
+    $color = [System.Drawing.Color]::Gainsboro
+    if ($Line -match '\[(OK)\s*\]') { $color = [System.Drawing.Color]::LightGreen }
+    elseif ($Line -match '\[WARN\s*\]') { $color = [System.Drawing.Color]::Khaki }
+    elseif ($Line -match '\[ERROR\s*\]') { $color = [System.Drawing.Color]::Salmon }
+    elseif ($Line -match '\[STEP\s*\]') { $color = [System.Drawing.Color]::SkyBlue }
+    $script:LogBox.SelectionStart = $script:LogBox.TextLength
+    $script:LogBox.SelectionLength = 0
+    $script:LogBox.SelectionColor = $color
+    $script:LogBox.AppendText($Line + [Environment]::NewLine)
+    $script:LogBox.ScrollToCaret()
+}
+
+function Read-NewLogLine {
+    <#
+    .SYNOPSIS
+        Lit les nouvelles lignes du journal de Build-Kit (fichier partagé, lecture incrémentale).
+    #>
+    if (-not $script:LogPath -or -not (Test-Path -LiteralPath $script:LogPath)) { return }
+    $fs = $null
+    try {
+        $fs = New-Object System.IO.FileStream($script:LogPath, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::ReadWrite)
+        if ($fs.Length -le $script:LogPos) { return }
+        [void]$fs.Seek($script:LogPos, [IO.SeekOrigin]::Begin)
+        $sr = New-Object System.IO.StreamReader($fs, [Text.Encoding]::UTF8)
+        $text = $sr.ReadToEnd()
+        $script:LogPos = $fs.Length
+        foreach ($l in ($text -split "`r?`n")) { if ($l) { Add-LogLine -Line $l } }
+        # Dernière étape connue affichée dans la barre d'état
+        $step = ($text -split "`r?`n" | Where-Object { $_ -match '\[STEP\s*\]|---' } | Select-Object -Last 1)
+        if ($step) { $script:Status.Text = ($step -replace '^.*\]\s*', '') }
+    }
+    catch { Write-Verbose $_.Exception.Message }
+    finally { if ($fs) { $fs.Dispose() } }
+}
+
+function Update-DriveList {
+    <#
+    .SYNOPSIS
+        Recherche les clés Ventoy branchées et remplit la liste déroulante.
+    #>
+    $script:DriveCombo.Items.Clear()
+    $label = 'Ventoy'
+    if ($script:ProfileCombo.SelectedIndex -ge 0) { $label = $script:Profiles[$script:ProfileCombo.SelectedIndex].Data.VolumeLabel }
+    foreach ($d in @(Find-KitVentoyDrive -ExpectedLabel $label)) {
+        [void]$script:DriveCombo.Items.Add(((T 'DriveFormat') -f $d.Root, $d.Label, $d.FreeGB, $d.TotalGB))
+    }
+    if ($script:DriveCombo.Items.Count -gt 0) { $script:DriveCombo.SelectedIndex = 0 }
+    else { [void]$script:DriveCombo.Items.Add((T 'NoDrive')); $script:DriveCombo.SelectedIndex = 0 }
+}
+
+function Update-ItemList {
+    <#
+    .SYNOPSIS
+        Affiche les éléments du profil choisi, groupés par catégorie, cochés par défaut.
+    #>
+    $script:ItemList.BeginUpdate()
+    $script:ItemList.Items.Clear(); $script:ItemList.Groups.Clear()
+    $p = $script:Profiles[$script:ProfileCombo.SelectedIndex]
+    $script:ProfileDesc.Text = $p.Data.Description
+    # Langues de contenu proposées par le profil (langue de l'interface présélectionnée si possible)
+    $script:LangCombo.Items.Clear()
+    $script:LangCodes = @()
+    if ($p.Data.ContainsKey('Langues')) {
+        $script:LangCodes = @($p.Data.Langues.Keys | Sort-Object)
+        foreach ($c in $script:LangCodes) { [void]$script:LangCombo.Items.Add(("{0} ({1})" -f $p.Data.Langues[$c].Label, $c)) }
+        $pref = $Interface
+        if ($script:LangCodes -notcontains $pref) { $pref = $p.Data.LangueDefaut }
+        $script:LangCombo.SelectedIndex = [array]::IndexOf($script:LangCodes, $pref)
+    }
+    $groups = @{}
+    foreach ($it in @($p.Data.Items)) {
+        $cat = 'Logiciel'; if ($it.ContainsKey('Category')) { $cat = $it.Category }
+        if (-not $groups.ContainsKey($cat)) {
+            $g = New-Object System.Windows.Forms.ListViewGroup($cat, $cat)
+            [void]$script:ItemList.Groups.Add($g); $groups[$cat] = $g
+        }
+        $mode = 'Auto'; if ($it.ContainsKey('Mode')) { $mode = $it.Mode }
+        $size = 0; if ($it.ContainsKey('EstimatedSizeMB')) { $size = [int]$it.EstimatedSizeMB }
+        $lvi = New-Object System.Windows.Forms.ListViewItem($it.Name, $groups[$cat])
+        [void]$lvi.SubItems.Add($(if ($size -ge 1024) { (T 'UnitGB') -f ($size / 1024) } else { (T 'UnitMB') -f $size }))
+        [void]$lvi.SubItems.Add($(if ($mode -eq 'Manuel') { (T 'UsageManual') } else { (T 'UsageAuto') }))
+        [void]$lvi.SubItems.Add([string]$it.Type)
+        $lvi.Checked = -not ($it.ContainsKey('Default') -and -not $it.Default)
+        $lvi.Tag = $it
+        $lvi.ImageKey = $(if ($it.Type -eq 'WindowsIso') { 'system' } elseif ($mode -eq 'Manuel') { 'tool' } else { 'package' })
+        [void]$script:ItemList.Items.Add($lvi)
+    }
+    $script:ItemList.EndUpdate()
+    Update-Total
+    Update-DriveList
+}
+
+function Update-Total {
+    <#
+    .SYNOPSIS
+        Affiche la taille estimée de la sélection.
+    #>
+    # Windows déclenche « ItemChecked » pendant la construction de la liste : on ignore
+    # les éléments pas encore prêts (sinon StrictMode lève une erreur sur un objet vide).
+    if (-not $script:TotalLabel) { return }
+    $sum = 0; $count = 0
+    for ($k = 0; $k -lt $script:ItemList.Items.Count; $k++) {
+        $i = $script:ItemList.Items[$k]
+        if ($null -eq $i -or -not $i.Checked) { continue }
+        $count++
+        if ($i.Tag -is [hashtable] -and $i.Tag.ContainsKey('EstimatedSizeMB')) { $sum += [int]$i.Tag.EstimatedSizeMB }
+    }
+    $script:TotalLabel.Text = ((T 'Selection') -f $count, ($sum / 1024))
+}
+
+function Set-Running {
+    <#
+    .SYNOPSIS
+        Bascule l'interface en mode « exécution en cours » ou « prête ».
+    #>
+    param([bool] $Running)
+    foreach ($c in @($script:BtnSimulate, $script:BtnBuild, $script:ProfileCombo, $script:DriveCombo, $script:ItemList, $script:BtnRefresh)) { $c.Enabled = -not $Running }
+    $script:BtnStop.Enabled = $Running
+    if ($Running) { $script:Progress.Style = 'Marquee' } else { $script:Progress.Style = 'Blocks'; $script:Progress.Value = 0 }
+}
+
+function Start-Build {
+    <#
+    .SYNOPSIS
+        Lance Build-Kit.ps1 avec les choix de la fenêtre, dans un processus séparé.
+    #>
+    param([bool] $Simulation)
+    $selected = @($script:ItemList.CheckedItems | ForEach-Object { $_.Text })
+    if ($selected.Count -eq 0) { [void][System.Windows.Forms.MessageBox]::Show((T 'NeedOneItem'), 'Kit Ventoy'); return }
+    $driveText = [string]$script:DriveCombo.SelectedItem
+    if ($driveText -notmatch '^([A-Z]):\\') { [void][System.Windows.Forms.MessageBox]::Show((T 'NeedDrive'), 'Kit Ventoy'); return }
+    $letter = $Matches[1]
+    if ($script:ChkBackup.Checked -and -not $script:BackupPath.Text) { [void][System.Windows.Forms.MessageBox]::Show((T 'NeedBackupPath'), 'Kit Ventoy'); return }
+    if (-not $Simulation) {
+        $msg = (T 'ConfirmBuild') -f $letter, $selected.Count
+        if ([System.Windows.Forms.MessageBox]::Show($msg, 'Kit Ventoy', 'YesNo', 'Question') -ne 'Yes') { return }
+    }
+
+    $logDir = Join-Path $kitRoot 'logs'
+    if (-not (Test-Path -LiteralPath $logDir)) { New-Item -ItemType Directory -Path $logDir -Force | Out-Null }
+    $script:LogPath = Join-Path $logDir ("assistant-{0}.log" -f (Get-Date -Format 'yyyyMMdd-HHmmss'))
+    $script:LogPos = 0L
+    $script:LogBox.Clear()
+
+    $p = $script:Profiles[$script:ProfileCombo.SelectedIndex]
+    $argList = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ('"{0}"' -f (Join-Path $kitRoot 'Build-Kit.ps1')),
+        '-Profil', $p.Name, '-DriveLetter', $letter, '-Only', ($selected -join ','), '-LogFile', ('"{0}"' -f $script:LogPath))
+    if ($Simulation) { $argList += '-DryRun' }
+    if ($script:LangCombo.SelectedIndex -ge 0 -and $script:LangCodes.Count -gt 0) { $argList += @('-Langue', $script:LangCodes[$script:LangCombo.SelectedIndex]) }
+    if (-not $script:ChkSignature.Checked) { $argList += '-SansVerifSignature' }
+    if ($script:ChkBackup.Checked) {
+        $argList += @('-SauvegardeVers', ('"{0}"' -f $script:BackupPath.Text))
+        if ($script:ChkBackupFull.Checked) { $argList += '-SauvegardeComplete' }
+    }
+    if ($script:IsoUrl.Text.Trim()) { $argList += @('-WindowsIsoUrl', ('"{0}"' -f $script:IsoUrl.Text.Trim())) }
+
+    $hostExe = (Get-Process -Id $PID).Path
+    $script:Process = Start-Process -FilePath $hostExe -ArgumentList $argList -WindowStyle Hidden -PassThru
+    Add-LogLine -Line ((T 'Starting') -f (($argList | Select-Object -Skip 5) -join ' '))
+    Set-Running -Running $true
+    $script:Timer.Start()
+}
+
+# --------------------------------------------------------------------------- fenêtre
+$form = New-Object System.Windows.Forms.Form
+$form.Text = (T 'WindowTitle')
+$form.Size = New-Object System.Drawing.Size(1130, 800)
+$form.MinimumSize = New-Object System.Drawing.Size(1060, 720)
+$form.StartPosition = 'CenterScreen'
+$form.AutoScaleMode = 'Dpi'
+Set-KitFormStyle -Form $form -Glyph 'Usb'
+$theme = Get-KitUiTheme
+$kitVersion = ''
+if (Test-Path -LiteralPath (Join-Path $kitRoot 'VERSION')) { $kitVersion = (Get-Content -LiteralPath (Join-Path $kitRoot 'VERSION') -TotalCount 1).Trim() }
+[void](Add-KitHeader -Form $form -Title (T 'Title') -Subtitle (T 'Intro') -Glyph 'Usb' -Version $kitVersion)
+
+# Profil
+$form.Controls.Add((New-Label -Text (T 'ProfileLabel') -X 18 -Y 76 -W 155 -Bold))
+$script:ProfileCombo = New-Object System.Windows.Forms.ComboBox
+$script:ProfileCombo.DropDownStyle = 'DropDownList'
+$script:ProfileCombo.Location = New-Object System.Drawing.Point(175, 72); $script:ProfileCombo.Size = New-Object System.Drawing.Size(340, 24)
+$form.Controls.Add($script:ProfileCombo)
+$script:ProfileDesc = New-Label -Text '' -X 530 -Y 70 -W 570 -H 36
+$script:ProfileDesc.Anchor = 'Top,Left,Right'
+$form.Controls.Add($script:ProfileDesc)
+
+# Langue du système installé (ISO, Office, clavier) et langue de l'interface
+$form.Controls.Add((New-Label -Text (T 'ContentLang') -X 18 -Y 114 -W 155 -Bold))
+$script:LangCombo = New-Object System.Windows.Forms.ComboBox
+$script:LangCombo.DropDownStyle = 'DropDownList'
+$script:LangCombo.Location = New-Object System.Drawing.Point(175, 110); $script:LangCombo.Size = New-Object System.Drawing.Size(220, 24)
+$form.Controls.Add($script:LangCombo)
+$form.Controls.Add((New-Label -Text (T 'InterfaceLang') -X 420 -Y 114 -W 140))
+$uiCombo = New-Object System.Windows.Forms.ComboBox
+$uiCombo.DropDownStyle = 'DropDownList'
+$uiCombo.Location = New-Object System.Drawing.Point(565, 110); $uiCombo.Size = New-Object System.Drawing.Size(140, 24)
+$uiCodes = @(Get-ChildItem -LiteralPath $langDir -Filter '*.psd1' | Sort-Object Name | ForEach-Object BaseName)
+foreach ($c in $uiCodes) { [void]$uiCombo.Items.Add((Import-PowerShellDataFile -Path (Join-Path $langDir "$c.psd1")).LangName) }
+$uiCombo.SelectedIndex = [array]::IndexOf($uiCodes, $Interface)
+$uiCombo.Add_SelectedIndexChanged({
+        # Changement de langue : la fenêtre est recréée dans la nouvelle langue
+        $new = $uiCodes[$uiCombo.SelectedIndex]
+        if ($new -ne $Interface -and -not ($script:Process -and -not $script:Process.HasExited)) {
+            $script:Restart = $new
+            $form.Close()
+        }
+    })
+$form.Controls.Add($uiCombo)
+
+# Clé
+$form.Controls.Add((New-Label -Text (T 'DriveLabel') -X 18 -Y 148 -W 155 -Bold))
+$script:DriveCombo = New-Object System.Windows.Forms.ComboBox
+$script:DriveCombo.DropDownStyle = 'DropDownList'
+$script:DriveCombo.Location = New-Object System.Drawing.Point(175, 144); $script:DriveCombo.Size = New-Object System.Drawing.Size(520, 24)
+$form.Controls.Add($script:DriveCombo)
+$script:BtnRefresh = New-Object System.Windows.Forms.Button
+$script:BtnRefresh.Text = (T 'Refresh'); $script:BtnRefresh.Location = New-Object System.Drawing.Point(705, 143); $script:BtnRefresh.Size = New-Object System.Drawing.Size(105, 28)
+$script:BtnRefresh.Add_Click({ Update-DriveList })
+$form.Controls.Add($script:BtnRefresh)
+$lnkVentoy = New-Object System.Windows.Forms.LinkLabel
+$lnkVentoy.Text = (T 'GetVentoy')
+$lnkVentoy.Location = New-Object System.Drawing.Point(820, 148); $lnkVentoy.Size = New-Object System.Drawing.Size(290, 22)
+$lnkVentoy.Add_LinkClicked({ Start-Process 'https://www.ventoy.net/fr/download.html' })
+$form.Controls.Add($lnkVentoy)
+
+# Liste des éléments
+$script:ItemList = New-Object System.Windows.Forms.ListView
+$script:ItemList.View = 'Details'; $script:ItemList.CheckBoxes = $true; $script:ItemList.FullRowSelect = $true
+$script:ItemList.SmallImageList = New-KitStateImageList -Size 20
+$script:ItemList.BorderStyle = 'FixedSingle'
+$script:ItemList.Location = New-Object System.Drawing.Point(18, 182); $script:ItemList.Size = New-Object System.Drawing.Size(640, 250)
+$script:ItemList.Anchor = 'Top,Left,Bottom'
+[void]$script:ItemList.Columns.Add((T 'ColItem'), 200)
+[void]$script:ItemList.Columns.Add((T 'ColSize'), 80)
+[void]$script:ItemList.Columns.Add((T 'ColUsage'), 190)
+[void]$script:ItemList.Columns.Add((T 'ColSource'), 110)
+$script:ItemList.Add_ItemChecked({ Update-Total })
+$form.Controls.Add($script:ItemList)
+
+$btnAll = New-Object System.Windows.Forms.Button
+$btnAll.Text = (T 'CheckAll'); $btnAll.Location = New-Object System.Drawing.Point(18, 438); $btnAll.Size = New-Object System.Drawing.Size(125, 28); $btnAll.Anchor = 'Bottom,Left'
+$btnAll.Add_Click({ foreach ($i in $script:ItemList.Items) { $i.Checked = $true } })
+$form.Controls.Add($btnAll)
+$btnNone = New-Object System.Windows.Forms.Button
+$btnNone.Text = (T 'CheckNone'); $btnNone.Location = New-Object System.Drawing.Point(149, 438); $btnNone.Size = New-Object System.Drawing.Size(120, 28); $btnNone.Anchor = 'Bottom,Left'
+$btnNone.Add_Click({ foreach ($i in $script:ItemList.Items) { $i.Checked = $false } })
+$form.Controls.Add($btnNone)
+$script:TotalLabel = New-Label -Text '' -X 278 -Y 443 -W 390
+$script:TotalLabel.Anchor = 'Bottom,Left'
+$form.Controls.Add($script:TotalLabel)
+$hint = New-Label -Text (T 'FreeSuiteHint') -X 18 -Y 466 -W 640
+$hint.ForeColor = $theme.Success
+$hint.Anchor = 'Bottom,Left'
+$form.Controls.Add($hint)
+
+# Options
+$grp = New-Object System.Windows.Forms.GroupBox
+$grp.Text = (T 'Options'); $grp.Location = New-Object System.Drawing.Point(672, 182); $grp.Size = New-Object System.Drawing.Size(430, 300)
+$grp.Anchor = 'Top,Left,Right'
+$form.Controls.Add($grp)
+$script:ChkSignature = New-Object System.Windows.Forms.CheckBox
+$script:ChkSignature.Text = (T 'VerifySig'); $script:ChkSignature.Checked = $true
+$script:ChkSignature.Location = New-Object System.Drawing.Point(14, 26); $script:ChkSignature.Size = New-Object System.Drawing.Size(410, 22)
+$grp.Controls.Add($script:ChkSignature)
+$grp.Controls.Add((New-Label -Text (T 'VerifySigNote') -X 32 -Y 48 -W 390))
+$script:ChkBackup = New-Object System.Windows.Forms.CheckBox
+$script:ChkBackup.Text = (T 'Backup')
+$script:ChkBackup.Location = New-Object System.Drawing.Point(14, 80); $script:ChkBackup.Size = New-Object System.Drawing.Size(410, 22)
+$grp.Controls.Add($script:ChkBackup)
+$script:BackupPath = New-Object System.Windows.Forms.TextBox
+$script:BackupPath.Location = New-Object System.Drawing.Point(32, 104); $script:BackupPath.Size = New-Object System.Drawing.Size(280, 24)
+$script:BackupPath.Text = [Environment]::GetFolderPath('MyDocuments')
+$grp.Controls.Add($script:BackupPath)
+$btnBrowse = New-Object System.Windows.Forms.Button
+$btnBrowse.Text = (T 'Browse'); $btnBrowse.Location = New-Object System.Drawing.Point(318, 102); $btnBrowse.Size = New-Object System.Drawing.Size(104, 28)
+$btnBrowse.Add_Click({
+        $dlg = New-Object System.Windows.Forms.FolderBrowserDialog
+        $dlg.Description = (T 'BackupDialog')
+        if ($dlg.ShowDialog() -eq 'OK') { $script:BackupPath.Text = $dlg.SelectedPath; $script:ChkBackup.Checked = $true }
+    })
+$grp.Controls.Add($btnBrowse)
+$script:ChkBackupFull = New-Object System.Windows.Forms.CheckBox
+$script:ChkBackupFull.Text = (T 'BackupFull')
+$script:ChkBackupFull.Location = New-Object System.Drawing.Point(32, 132); $script:ChkBackupFull.Size = New-Object System.Drawing.Size(390, 22)
+$grp.Controls.Add($script:ChkBackupFull)
+$grp.Controls.Add((New-Label -Text (T 'IsoUrlLabel') -X 14 -Y 170 -W 410 -H 36))
+$script:IsoUrl = New-Object System.Windows.Forms.TextBox
+$script:IsoUrl.Location = New-Object System.Drawing.Point(14, 208); $script:IsoUrl.Size = New-Object System.Drawing.Size(406, 24)
+$grp.Controls.Add($script:IsoUrl)
+$lnkIso = New-Object System.Windows.Forms.LinkLabel
+$lnkIso.Text = (T 'IsoUrlLink')
+$lnkIso.Location = New-Object System.Drawing.Point(14, 236); $lnkIso.Size = New-Object System.Drawing.Size(300, 22)
+$lnkIso.Add_LinkClicked({ Start-Process 'https://www.microsoft.com/fr-fr/software-download/windows11' })
+$grp.Controls.Add($lnkIso)
+$grp.Controls.Add((New-Label -Text (T 'Tip') -X 14 -Y 260 -W 410 -H 36))
+
+# Boutons d'action
+$script:BtnSimulate = New-Object System.Windows.Forms.Button
+$script:BtnSimulate.Text = (T 'Simulate'); $script:BtnSimulate.Location = New-Object System.Drawing.Point(18, 492); $script:BtnSimulate.Size = New-Object System.Drawing.Size(205, 36)
+$script:BtnSimulate.Anchor = 'Bottom,Left'
+$script:BtnSimulate.Add_Click({ Start-Build -Simulation $true })
+$form.Controls.Add($script:BtnSimulate)
+$script:BtnBuild = New-Object System.Windows.Forms.Button
+$script:BtnBuild.Text = (T 'Build'); $script:BtnBuild.Location = New-Object System.Drawing.Point(231, 492); $script:BtnBuild.Size = New-Object System.Drawing.Size(240, 36)
+$script:BtnBuild.Anchor = 'Bottom,Left'
+$script:BtnBuild.Add_Click({ Start-Build -Simulation $false })
+$form.Controls.Add($script:BtnBuild)
+$script:BtnStop = New-Object System.Windows.Forms.Button
+$script:BtnStop.Text = (T 'Stop'); $script:BtnStop.Enabled = $false; $script:BtnStop.Location = New-Object System.Drawing.Point(479, 492); $script:BtnStop.Size = New-Object System.Drawing.Size(105, 36)
+$script:BtnStop.Anchor = 'Bottom,Left'
+$script:BtnStop.Add_Click({
+        if ($script:Process -and -not $script:Process.HasExited) {
+            # Arrêt propre : un prochain lancement reprendra les téléchargements partiels
+            & taskkill.exe /PID $script:Process.Id /T /F | Out-Null
+            Add-LogLine -Line (T 'StopRequested')
+        }
+    })
+$form.Controls.Add($script:BtnStop)
+$btnLogs = New-Object System.Windows.Forms.Button
+$btnLogs.Text = (T 'Logs'); $btnLogs.Location = New-Object System.Drawing.Point(592, 492); $btnLogs.Size = New-Object System.Drawing.Size(115, 36)
+$btnLogs.Anchor = 'Bottom,Left'
+$btnLogs.Add_Click({ $d = Join-Path $kitRoot 'logs'; if (-not (Test-Path $d)) { New-Item -ItemType Directory $d | Out-Null }; Start-Process explorer.exe $d })
+$form.Controls.Add($btnLogs)
+$script:Progress = New-Object System.Windows.Forms.ProgressBar
+$script:Progress.Location = New-Object System.Drawing.Point(717, 499); $script:Progress.Size = New-Object System.Drawing.Size(385, 22)
+$script:Progress.Anchor = 'Bottom,Left,Right'
+$form.Controls.Add($script:Progress)
+
+# Journal
+$script:LogBox = New-Object System.Windows.Forms.RichTextBox
+$script:LogBox.ReadOnly = $true; $script:LogBox.BackColor = [System.Drawing.Color]::FromArgb(30, 30, 30)
+$script:LogBox.ForeColor = [System.Drawing.Color]::Gainsboro; $script:LogBox.Font = New-Object System.Drawing.Font('Consolas', 9)
+$script:LogBox.Location = New-Object System.Drawing.Point(18, 534); $script:LogBox.Size = New-Object System.Drawing.Size(1084, 190)
+$script:LogBox.Anchor = 'Bottom,Left,Right'; $script:LogBox.WordWrap = $false
+$form.Controls.Add($script:LogBox)
+$statusStrip = New-Object System.Windows.Forms.StatusStrip
+$script:Status = New-Object System.Windows.Forms.ToolStripStatusLabel
+$script:Status.Text = (T 'Ready')
+[void]$statusStrip.Items.Add($script:Status)
+$form.Controls.Add($statusStrip)
+
+# Minuterie : suivi du journal et de la fin du processus
+$script:Timer = New-Object System.Windows.Forms.Timer
+$script:Timer.Interval = 700
+$script:Timer.Add_Tick({
+        Read-NewLogLine
+        if ($script:Process -and $script:Process.HasExited) {
+            $script:Timer.Stop()
+            Read-NewLogLine
+            $code = $script:Process.ExitCode
+            Set-Running -Running $false
+            $texte = switch ($code) {
+                0 { (T 'Done0') }
+                1 { (T 'Done1') }
+                3 { (T 'Done3') }
+                default { (T 'DoneOther') -f $code }
+            }
+            $script:Status.Text = $texte
+            Update-DriveList
+            [void][System.Windows.Forms.MessageBox]::Show($texte, 'Kit Ventoy', 'OK', $(if ($code -eq 0) { 'Information' } else { 'Warning' }))
+        }
+    })
+
+$form.Add_FormClosing({
+        param($s, $e)
+        if ($script:Process -and -not $script:Process.HasExited) {
+            $r = [System.Windows.Forms.MessageBox]::Show((T 'CloseRunning'), 'Kit Ventoy', 'YesNoCancel', 'Question')
+            if ($r -eq 'Cancel') { $e.Cancel = $true }
+            elseif ($r -eq 'No') { & taskkill.exe /PID $script:Process.Id /T /F | Out-Null }
+        }
+        [void]$s
+    })
+
+# --------------------------------------------------------------------------- style des boutons
+Set-KitButtonStyle -Button $script:BtnBuild -Kind Primary -Glyph 'Play'
+Set-KitButtonStyle -Button $script:BtnSimulate -Kind Secondary -Glyph 'Search'
+Set-KitButtonStyle -Button $script:BtnStop -Kind Danger -Glyph 'Stop'
+Set-KitButtonStyle -Button $btnLogs -Kind Secondary -Glyph 'Folder'
+Set-KitButtonStyle -Button $script:BtnRefresh -Kind Secondary -Glyph 'Refresh'
+Set-KitButtonStyle -Button $btnBrowse -Kind Secondary -Glyph 'Folder'
+Set-KitButtonStyle -Button $btnAll -Kind Secondary -Glyph 'Check'
+Set-KitButtonStyle -Button $btnNone -Kind Secondary
+$grp.ForeColor = $theme.Accent
+foreach ($c in $grp.Controls) { if ($c -is [System.Windows.Forms.Control]) { $c.ForeColor = $theme.Text } }
+
+# --------------------------------------------------------------------------- chargement
+$profileDir = Join-Path $kitRoot 'config\profils'
+$script:Profiles = @(Get-ChildItem -LiteralPath $profileDir -Filter '*.psd1' | Sort-Object Name | ForEach-Object {
+        [pscustomobject]@{ Name = $_.BaseName; Data = (Import-PowerShellDataFile -Path $_.FullName) }
+    })
+foreach ($p in $script:Profiles) { [void]$script:ProfileCombo.Items.Add($p.Data.Nom) }
+$script:ProfileCombo.Add_SelectedIndexChanged({ Update-ItemList })
+if ($script:Profiles.Count -gt 0) { $script:ProfileCombo.SelectedIndex = 0 }
+
+if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
+    Add-LogLine -Line (T 'NoWinget')
+}
+
+if ($TestSansAffichage) {
+    Write-Output ("Fenêtre construite : {0} profil(s), {1} élément(s), {2} clé(s) Ventoy détectée(s)." -f $script:Profiles.Count, $script:ItemList.Items.Count, @(Find-KitVentoyDrive).Count)
+    if ($Capture) {
+        $form.Show(); [System.Windows.Forms.Application]::DoEvents()
+        $bmp = New-Object System.Drawing.Bitmap($form.Width, $form.Height)
+        $form.DrawToBitmap($bmp, (New-Object System.Drawing.Rectangle(0, 0, $form.Width, $form.Height)))
+        $bmp.Save($Capture, [System.Drawing.Imaging.ImageFormat]::Png); $bmp.Dispose(); $form.Hide()
+    }
+    $form.Dispose()
+    return
+}
+[void]$form.ShowDialog()
+$form.Dispose()
+if ($script:Restart) {
+    # Relance de l'assistant dans la langue choisie
+    & $PSCommandPath -Interface $script:Restart
+}
