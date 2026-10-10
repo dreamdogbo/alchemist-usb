@@ -25,10 +25,22 @@ function ConvertTo-KitRelPath {
         [Parameter(Mandatory)] [string] $Root,
         [Parameter(Mandatory)] [string] $FullPath
     )
-    $r = [IO.Path]::GetFullPath($Root).TrimEnd('\') + '\'
+    $sep = [IO.Path]::DirectorySeparatorChar
+    $r = [IO.Path]::GetFullPath($Root).TrimEnd('\', '/') + $sep
     $f = [IO.Path]::GetFullPath($FullPath)
     if (-not $f.StartsWith($r, [StringComparison]::OrdinalIgnoreCase)) { throw "$f n'est pas sous $r" }
     return $f.Substring($r.Length).Replace('\', '/')
+}
+
+function ConvertTo-KitLocalPath {
+    <#
+    .SYNOPSIS
+        Convertit un chemin relatif du MANIFEST (« a/b/c ») au séparateur du système (Windows ou Linux).
+    #>
+    [CmdletBinding()]
+    [OutputType([string])]
+    param([Parameter(Mandatory)] [AllowEmptyString()] [string] $Path)
+    return $Path.Replace('/', [IO.Path]::DirectorySeparatorChar).Replace('\', [IO.Path]::DirectorySeparatorChar)
 }
 
 function Read-KitManifest {
@@ -140,7 +152,7 @@ function Sync-KitStage {
         [switch] $KeepStage
     )
     $targetRoot = $KeyRoot
-    if ($TargetDir) { $targetRoot = Join-Path $KeyRoot ($TargetDir.Replace('/', '\')) }
+    if ($TargetDir) { $targetRoot = Join-Path $KeyRoot (ConvertTo-KitLocalPath $TargetDir) }
     $result = [pscustomobject]@{ Moved = 0; Unchanged = 0; Removed = 0; Conflicts = @(); Bytes = 0.0 }
     $newSet = @{}
 
@@ -148,7 +160,7 @@ function Sync-KitStage {
             Where-Object { $_.Name -notlike '*.part' -and $_.Name -notlike '*.part.src' })
     foreach ($f in $files) {
         $relInStage = ConvertTo-KitRelPath -Root $StageDir -FullPath $f.FullName
-        $dest = Join-Path $targetRoot ($relInStage.Replace('/', '\'))
+        $dest = Join-Path $targetRoot (ConvertTo-KitLocalPath $relInStage)
         $rel = ConvertTo-KitRelPath -Root $KeyRoot -FullPath $dest
         $len = $f.Length
         if ($len -gt 1GB) { Write-KitLog -Message ("SHA256 de {0} ({1})…" -f $rel, (Format-KitSize $len)) }
@@ -183,7 +195,7 @@ function Sync-KitStage {
     foreach ($scope in $ObsoleteScope) {
         foreach ($k in @($Manifest.Keys)) {
             if ($k.StartsWith($scope, [StringComparison]::OrdinalIgnoreCase) -and -not $newSet.ContainsKey($k)) {
-                $p = Join-Path $KeyRoot ($k.Replace('/', '\'))
+                $p = Join-Path $KeyRoot (ConvertTo-KitLocalPath $k)
                 if ((Test-Path -LiteralPath $p) -and $PSCmdlet.ShouldProcess($p, 'Supprimer ancienne version')) {
                     Remove-Item -LiteralPath $p -Force
                     $result.Removed++
@@ -191,7 +203,7 @@ function Sync-KitStage {
                 $Manifest.Remove($k)
             }
         }
-        $scopeDir = Join-Path $KeyRoot ($scope.TrimEnd('/').Replace('/', '\'))
+        $scopeDir = Join-Path $KeyRoot (ConvertTo-KitLocalPath $scope.TrimEnd('/'))
         if (Test-Path -LiteralPath $scopeDir -PathType Container) { Remove-KitEmptyDirectory -Path $scopeDir }
     }
 
@@ -268,5 +280,5 @@ function New-KitCatalogue {
     return $Destination
 }
 
-Export-ModuleMember -Function ConvertTo-KitRelPath, Read-KitManifest, Write-KitManifest, Get-KitManagedSize,
+Export-ModuleMember -Function ConvertTo-KitRelPath, ConvertTo-KitLocalPath, Read-KitManifest, Write-KitManifest, Get-KitManagedSize,
     Remove-KitEmptyDirectory, Sync-KitStage, New-KitCatalogue

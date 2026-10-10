@@ -9,11 +9,11 @@
 #
 Set-StrictMode -Version Latest
 
-$script:UserAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) kit-ventoy/2.0'
+$script:UserAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) alchemist/1.2'
 $script:MaxAttempts = 3
 $script:SkipSignature = $false
 # Agent « honnête » pour les sites qui bloquent les robots se présentant comme un navigateur (Fedora…)
-$script:PlainAgent = 'kit-ventoy/2.0 (+https://github.com/dreamdogbo/kit-ventoy)'
+$script:PlainAgent = 'alchemist/1.2 (+https://github.com/dreamdogbo/alchemist-usb)'
 
 function Set-KitSignaturePolicy {
     <#
@@ -147,10 +147,17 @@ function Resolve-KitLinuxIso {
     param([Parameter(Mandatory)] [hashtable] $Item)
     switch ($Item.Distro) {
         'Ubuntu' {
-            $meta = Get-KitText -Url 'https://changelogs.ubuntu.com/meta-release-lts'
-            $block = @($meta -split "`r?`n`r?`n" | Where-Object { $_ -match 'Supported: 1' }) | Select-Object -Last 1
-            if (-not $block -or $block -notmatch 'Version:\s*(\d+\.\d+)') { throw 'Version LTS Ubuntu introuvable.' }
-            $series = $Matches[1]
+            if ($Item.ContainsKey('Series') -and $Item.Series) {
+                # Version LTS imposée par le profil (ex. 24.04)
+                $series = [string]$Item.Series
+            }
+            else {
+                # Dernière LTS supportée, d'après le fichier officiel d'Ubuntu
+                $meta = Get-KitText -Url 'https://changelogs.ubuntu.com/meta-release-lts'
+                $block = @($meta -split "`r?`n`r?`n" | Where-Object { $_ -match 'Supported: 1' }) | Select-Object -Last 1
+                if (-not $block -or $block -notmatch 'Version:\s*(\d+\.\d+)') { throw 'Version LTS Ubuntu introuvable.' }
+                $series = $Matches[1]
+            }
             $base = "https://releases.ubuntu.com/$series/"
             $sums = Get-KitText -Url ($base + 'SHA256SUMS')
             $hit = Find-KitChecksum -Text $sums -Pattern '^ubuntu-[\d.]+-desktop-amd64\.iso$'
@@ -694,7 +701,8 @@ function Get-KitWindowsIsoUrl {
     )
     $last = ''
     for ($attempt = 1; $attempt -le $script:MaxAttempts; $attempt++) {
-        $out = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $FidoPath `
+        $psHost = $(if (Test-KitWindows) { 'powershell.exe' } else { (Get-Process -Id $PID).Path })
+        $out = & $psHost -NoProfile -ExecutionPolicy Bypass -File $FidoPath `
             -Win $Item.FidoWin -Rel $Item.FidoRel -Ed $Item.FidoEd -Lang $Item.FidoLang -Arch $Item.FidoArch -GetUrl 2>&1 |
             ForEach-Object { [string]$_ }
         $url = @($out | Where-Object { $_ -match '^https://\S+\.iso' }) | Select-Object -Last 1
