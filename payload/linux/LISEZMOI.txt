@@ -1,0 +1,39 @@
+==========================================================================
+ CLÉ D'INSTALLATION LINUX (Ubuntu LTS, Linux Mint, Debian, Fedora…)
+ Alchemist v{{KIT_VERSION}} by dreamdogbo — https://github.com/dreamdogbo/alchemist-usb
+==========================================================================
+
+CONTENU DE LA CLÉ
+  ISO\Linux\<Distribution>\*.iso   Systèmes Linux officiels (SHA256 vérifiés)
+  linux\lancer.sh                  Assistant d'installation des logiciels (fenêtre)
+  linux\installer-poste.sh         Moteur (ligne de commande, toutes distributions)
+  MANIFEST.sha256                  Empreintes de contrôle (ne pas modifier)
+
+ÉTAPE 1 — INSTALLER LINUX
+  1. Brancher la clé, allumer le PC, menu de démarrage (F12, F11, F9, F8 ou Échap).
+  2. Choisir la clé USB : le menu Ventoy liste les systèmes.
+  3. Choisir l'ISO (Ubuntu LTS conseillée), puis « Boot in normal mode ».
+  4. Suivre l'installateur (langue, clavier, disque, compte). Choisir l'installation
+     « par défaut » et cocher « logiciels tiers » (pilotes, codecs) si proposé.
+     ATTENTION au choix du disque : effacer un disque supprime ses données.
+
+ÉTAPE 2 — LOGICIELS (sur le bureau Linux, avec Internet)
+  1. Ouvrir la clé dans le gestionnaire de fichiers, dossier « linux ».
+  2. Clic droit dans le dossier → « Ouvrir dans un terminal », puis taper :
+        bash lancer.sh
+  3. Choisir l'usage (bureautique / développement), cocher les logiciels, valider.
+     Le mot de passe de l'utilisateur est demandé (droits administrateur).
+  4. À la fin, redémarrer.
+  Sans fenêtre :  sudo bash installer-poste.sh -u developpement -y
+  Simulation  :   bash installer-poste.sh -u developpement -n -y
+
+MICROSOFT 365 SOUS LINUX
+  - Word, Excel, PowerPoint, Outlook, Teams, OneDrive : applications web installées
+    dans le menu (Microsoft Edge), fidélité totale, compte Microsoft 365 requis.
+  - ONLYOFFICE : éditeur local très compatible .docx/.xlsx/.pptx.
+  - Office de bureau complet : composant « winboat » (Windows en conteneur, licence requise).
+
+EN CAS DE PROBLÈME
+  - Journal : /var/log/kit-poste/ (copie dans le dossier personnel).
+  - Une ligne « ÉCHEC » : relancer (ce qui est fait est sauté).
+  - Pilotes : Ubuntu/Mint « Logiciels et mises à jour → Pilotes additionnels ».
