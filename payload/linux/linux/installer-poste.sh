@@ -166,7 +166,14 @@ en_utilisateur() {
 en_session() {
   if [ "$SIMULATION" -eq 1 ]; then echo "  [simulation] ($UTILISATEUR, session) $*"; return 0; fi
   local uid; uid="$(id -u "$UTILISATEUR")"
-  sudo -u "$UTILISATEUR" -H env XDG_RUNTIME_DIR="/run/user/$uid" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$uid/bus" bash -lc "$*"
+  # L'écran est transmis (FreeRDP en a besoin pour installer et afficher Office)
+  local ecran=()
+  [ -n "${DISPLAY:-}" ] && ecran+=("DISPLAY=$DISPLAY")
+  [ -n "${WAYLAND_DISPLAY:-}" ] && ecran+=("WAYLAND_DISPLAY=$WAYLAND_DISPLAY")
+  [ -n "${XAUTHORITY:-}" ] && ecran+=("XAUTHORITY=$XAUTHORITY")
+  # Dossiers propres à l'utilisateur (aucune configuration héritée d'un autre compte)
+  sudo -u "$UTILISATEUR" -H env -u XDG_CONFIG_HOME -u XDG_DATA_HOME -u XDG_CACHE_HOME -u CONTAINERS_CONF -u CONTAINERS_STORAGE_CONF \
+    HOME="$HOME_UTILISATEUR" XDG_RUNTIME_DIR="/run/user/$uid" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$uid/bus" "${ecran[@]}" bash -lc "$*"
 }
 
 PAQ_A_JOUR=0
@@ -457,7 +464,24 @@ comp_office365() {
   paquets "podman podman-compose freerdp3-x11 freerdp3-wayland python3 python3-pyside6.qtwidgets python3-pyside6.qtuitools python3-pyside6.qtcore" \
           "podman podman-compose freerdp python3 python3-pyside6"
   lancer usermod -aG kvm "$UTILISATEUR"
+  # Podman sans root : identifiants subordonnés (/etc/subuid, /etc/subgid) pour l'utilisateur
+  if ! grep -q "^$UTILISATEUR:" /etc/subuid 2>/dev/null; then
+    lancer usermod --add-subuids 100000-165535 --add-subgids 100000-165535 "$UTILISATEUR"
+  fi
+  # Session systemd de l'utilisateur (requise par Podman sans root), y compris hors connexion graphique
   lancer loginctl enable-linger "$UTILISATEUR" || true
+  if [ "$SIMULATION" -eq 0 ]; then
+    local uid; uid="$(id -u "$UTILISATEUR")"
+    lancer systemctl start "user@$uid.service" || true
+    for _ in $(seq 1 30); do [ -S "/run/user/$uid/bus" ] && break; sleep 1; done
+    en_session "podman system migrate >/dev/null 2>&1 || true"
+    if ! en_session "podman info >/dev/null 2>&1"; then
+      rouge "  Podman sans root ne fonctionne pas pour $UTILISATEUR :"
+      en_session "podman info 2>&1 | tail -n 8" || true
+      return 1
+    fi
+    echo "  Podman sans root : opérationnel"
+  fi
   tag="$(github_tag eylenburg/linoffice)"
   [ -z "$tag" ] && { jaune "  LinOffice : version introuvable"; return 1; }
   echo "  LinOffice $tag : installation dans ~/.local/bin/linoffice"

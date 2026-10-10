@@ -1,0 +1,53 @@
+name: Test réel Linux
+
+# Installation RÉELLE de la stack « développement » sur une vraie machine Ubuntu (GitHub Actions),
+# puis vérification que chaque outil répond. Rien n'est installé sur les postes des contributeurs.
+# Microsoft 365 intégral (LinOffice) est exclu : session graphique et compte Microsoft nécessaires.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 4 * * 1'          # chaque lundi : détecte les dépôts officiels qui changent
+  pull_request:
+    paths:
+      - 'payload/linux/**'
+      - 'tests/linux/**'
+      - '.github/workflows/test-reel-linux.yml'
+
+jobs:
+  installation:
+    name: Installation réelle (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04]
+    env:
+      GITHUB_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Partir d'un état réaliste (Docker préinstallé du runner retiré)
+        run: |
+          sudo apt-get remove -y -qq moby-engine moby-cli moby-buildx moby-compose moby-containerd moby-runc docker.io 2>/dev/null || true
+          df -h /
+
+      - name: Installation réelle de la stack développement
+        run: |
+          sudo bash payload/linux/linux/installer-poste.sh -u developpement -y \
+            -c base,flatpak,pilotes,codecs,polices,bureau,securite,sauvegarde,chrome,onlyoffice,pdf,zoom,devbase,git,vscode,docker,dockerdesktop,virtualisation,python,node,java,dotnet,go,rust,api,bdd,devops
+
+      - name: Vérification de chaque outil
+        run: bash tests/linux/verifier-poste.sh
+
+      - name: Idempotence (deuxième passage, rien à refaire)
+        run: |
+          sudo bash payload/linux/linux/installer-poste.sh -u developpement -y -c git,vscode,docker,python,go 2>&1 | tee /tmp/second.log
+          grep -c 'déjà' /tmp/second.log
+
+      - name: Microsoft 365 intégral (simulation)
+        run: bash payload/linux/linux/installer-poste.sh -c office365 -n -y
+
+      - name: Journal
+        if: always()
+        run: sudo sh -c 'tail -n 80 /var/log/kit-poste/*.log' || true

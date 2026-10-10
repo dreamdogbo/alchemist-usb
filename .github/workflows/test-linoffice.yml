@@ -1,0 +1,77 @@
+name: Test Office 365 intégral (LinOffice)
+
+# Installation RÉELLE de Microsoft 365 de bureau via LinOffice sur une machine GitHub :
+# Windows minimal (KVM) + Office téléchargés depuis Microsoft, diagnostic, ouverture de Word
+# sur un écran virtuel et capture d'écran (artefact téléchargeable).
+# Sans compte Microsoft 365, Office fonctionne en période d'essai : suffisant pour vérifier
+# que les applications démarrent. Long (1 à 3 h) : lancé à la demande et une fois par mois.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 3 1 * *'
+  pull_request:
+    paths:
+      - '.github/workflows/test-linoffice.yml'
+
+jobs:
+  linoffice:
+    name: Microsoft 365 intégral sur Ubuntu
+    runs-on: ubuntu-24.04
+    timeout-minutes: 350
+    env:
+      GITHUB_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Préparer KVM, l'utilisateur de test (disque /mnt) et l'écran virtuel
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm.rules
+          sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm
+          ls -l /dev/kvm && nproc && free -g && df -h / /mnt
+          sudo useradd -m -d /mnt/testeur -s /bin/bash testeur
+          echo 'testeur ALL=(ALL) NOPASSWD:ALL' | sudo tee /etc/sudoers.d/testeur
+          sudo apt-get install -y -qq xvfb imagemagick x11-utils >/dev/null
+          nohup Xvfb :99 -screen 0 1600x900x24 >/tmp/xvfb.log 2>&1 &
+          sleep 3
+
+      - name: Installation réelle de Microsoft 365 intégral (LinOffice)
+        timeout-minutes: 260
+        run: sudo -E SUDO_USER=testeur DISPLAY=:99 bash payload/linux/linux/installer-poste.sh -c office365 -y
+
+      - name: Diagnostic Podman (utilisateur de test)
+        if: always()
+        run: |
+          grep testeur /etc/subuid /etc/subgid || true
+          ls -ld /run/user/$(id -u testeur) || true
+          sudo -u testeur -H env XDG_RUNTIME_DIR="/run/user/$(id -u testeur)" bash -lc 'podman info 2>&1 | tail -n 25' || true
+          sysctl kernel.apparmor_restrict_unprivileged_userns kernel.unprivileged_userns_clone 2>/dev/null || true
+
+      - name: Diagnostic LinOffice
+        if: always()
+        run: sudo -u testeur -H env XDG_RUNTIME_DIR="/run/user/$(id -u testeur)" DISPLAY=:99 bash -lc '~/.local/bin/linoffice/setup.sh --healthcheck'
+
+      - name: Ouvrir Word, Excel et PowerPoint, captures d'écran
+        if: success()
+        run: |
+          mkdir -p captures
+          for app in word excel powerpoint; do
+            sudo -u testeur -H env XDG_RUNTIME_DIR="/run/user/$(id -u testeur)" DISPLAY=:99 \
+              bash -lc "nohup ~/.local/bin/linoffice/linoffice.sh $app >/tmp/$app.log 2>&1 &"
+            sleep 120
+            DISPLAY=:99 import -window root "captures/$app.png" || true
+            DISPLAY=:99 xwininfo -root -tree | grep -iE 'word|excel|powerpoint|freerdp' | head -5 || true
+          done
+
+      - name: Journaux et captures (artefact)
+        if: always()
+        run: |
+          mkdir -p artefact
+          cp -r captures artefact/ 2>/dev/null || true
+          sudo cp /var/log/kit-poste/*.log artefact/ 2>/dev/null || true
+          sudo find /mnt/testeur/.local/share/linoffice -maxdepth 2 -name '*.log' -exec cp {} artefact/ \; 2>/dev/null || true
+          sudo chown -R "$(id -u)" artefact
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: linoffice-captures-et-journaux
+          path: artefact/
