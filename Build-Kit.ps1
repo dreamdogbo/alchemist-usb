@@ -54,6 +54,22 @@
     clé, la mise en place est un simple déplacement.
 .PARAMETER LogFile
     Chemin imposé du journal (utilisé par l'assistant graphique pour l'afficher en direct).
+.PARAMETER InstallerVentoy
+    Installe Ventoy (release officielle, SHA256 vérifié) sur le disque -Disque AVANT de préparer le
+    contenu. EFFACE le disque : exige -ConfirmerEffacement EFFACER-<numéro> et les droits administrateur.
+    Disques USB/SD uniquement, jamais le disque système ni celui où se trouve le kit.
+.PARAMETER Disque
+    Numéro du disque (Get-Disk, ou liste de l'assistant) pour -InstallerVentoy.
+.PARAMETER ConfirmerEffacement
+    Confirmation explicite de l'effacement : « EFFACER-<numéro du disque> ».
+.PARAMETER VentoyGPT
+    Table de partitions GPT au lieu de MBR (défaut Ventoy).
+.PARAMETER VentoySansSecureBoot
+    Désactive la prise en charge du Secure Boot par Ventoy (déconseillé).
+.PARAMETER VentoyFS
+    Système de fichiers de la partition de données : exFAT (défaut Ventoy) ou NTFS.
+.PARAMETER MettreAJourVentoy
+    Met à jour Ventoy sur la clé détectée, SANS effacer les données (mode Update officiel).
 
 .EXAMPLE
     .\Build-Kit.ps1 -DryRun
@@ -61,6 +77,10 @@
     .\Build-Kit.ps1 -Profil windows11-bureautique -DriveLetter E
 .EXAMPLE
     .\Build-Kit.ps1 -Only Chrome,Firefox -SauvegardeVers D:\Sauvegardes
+.EXAMPLE
+    .\Build-Kit.ps1 -InstallerVentoy -Disque 2 -ConfirmerEffacement EFFACER-2 -SauvegardeVers D:\Sauvegardes
+.EXAMPLE
+    .\Build-Kit.ps1 -MettreAJourVentoy
 
 .NOTES
     Codes de sortie : 0 = OK, 1 = au moins un élément en ÉCHEC, 2 = clé invalide ou erreur
@@ -83,7 +103,14 @@ param(
     [switch] $SauvegardeComplete,
     [string] $WindowsIsoUrl,
     [string] $CachePath,
-    [string] $LogFile
+    [string] $LogFile,
+    [switch] $InstallerVentoy,
+    [int] $Disque = -1,
+    [string] $ConfirmerEffacement,
+    [switch] $VentoyGPT,
+    [switch] $VentoySansSecureBoot,
+    [ValidateSet('exFAT', 'NTFS')] [string] $VentoyFS = 'exFAT',
+    [switch] $MettreAJourVentoy
 )
 
 Set-StrictMode -Version Latest
@@ -96,7 +123,7 @@ $kitRoot = $PSScriptRoot
 $kitVersion = '0.0.0'
 $versionFile = Join-Path $kitRoot 'VERSION'
 if (Test-Path -LiteralPath $versionFile) { $kitVersion = (Get-Content -LiteralPath $versionFile -TotalCount 1).Trim() }
-foreach ($m in @('Report', 'Drive', 'Budget', 'Download', 'Sync', 'Backup')) {
+foreach ($m in @('Report', 'Drive', 'Budget', 'Download', 'Sync', 'Backup', 'Ventoy')) {
     Import-Module (Join-Path $kitRoot "modules\$m.psm1") -Force -DisableNameChecking
 }
 
@@ -167,6 +194,39 @@ try {
     $marginBytes = [double]$config.MarginMB * 1MB
 
     # ------------------------------------------------------------------ 1. clé
+    # ------------------------------------------------------------------ 0b. installation de Ventoy (option)
+    if ($InstallerVentoy) {
+        $phase = 'ventoy'
+        Write-KitLog -Level STEP -Message "0. Installation de Ventoy sur le disque $Disque (le disque sera EFFACÉ)"
+        if ($Disque -lt 0) { throw 'Précisez le disque : -Disque <numéro> (voir Get-Disk ou la liste de l''assistant).' }
+        if ($ConfirmerEffacement -cne "EFFACER-$Disque") {
+            throw "Confirmation manquante : ajoutez -ConfirmerEffacement EFFACER-$Disque (toutes les données du disque $Disque seront perdues)."
+        }
+        $target = Assert-KitVentoyTarget -DiskNumber $Disque -KitRoot $kitRoot
+        Write-KitLog -Message ("Disque cible : {0} — {1} — {2} Go — lettres : {3}" -f $target.Number, $target.Model, $target.SizeGB, ($target.Letters -join ', '))
+        if ($DryRun) {
+            Write-KitLog -Level WARN -Message 'Simulation : Ventoy serait installé (rien n''est effacé en simulation).'
+            if (-not $target.IsVentoy) {
+                Add-KitResult -Name 'Ventoy' -Status 'OK' -Detail "serait installé sur le disque $Disque (simulation)"
+                $exitCode = Show-KitReport -DryRun
+                exit $exitCode
+            }
+        }
+        else {
+            if (-not (Test-KitAdmin)) { throw 'L''installation de Ventoy nécessite les droits administrateur (relancez en administrateur ou via l''assistant).' }
+            if ($SauvegardeVers) {
+                foreach ($l in $target.Letters) {
+                    $bk = Backup-KitDrive -KeyRoot ("{0}:\" -f $l) -Destination $SauvegardeVers -Manifest @{} -Complete
+                    if ($bk.Files -gt 0) { Add-KitResult -Name "Sauvegarde $l`:" -Status 'OK' -Detail ("{0} fichier(s) dans {1}" -f $bk.Files, $bk.Folder) -SizeMB ($bk.Bytes / 1MB) }
+                }
+                $SauvegardeVers = $null   # la clé sera vierge : rien d'autre à sauvegarder ensuite
+            }
+            $ventoy = Save-KitVentoy -ToolsDir (Join-Path ([IO.Path]::GetTempPath()) 'kit-ventoy-ventoy')
+            Invoke-KitVentoy2Disk -Exe $ventoy.Exe -Mode Install -DiskNumber $Disque -Gpt:$VentoyGPT -NoSecureBoot:$VentoySansSecureBoot -FileSystem $VentoyFS -Confirm:$false
+            $DriveLetter = Wait-KitVentoyVolume -DiskNumber $Disque -Label $config.VolumeLabel
+            Add-KitResult -Name 'Ventoy' -Status 'OK' -Detail ("Ventoy {0} installé sur le disque {1} ({2}:)" -f $ventoy.Version, $Disque, $DriveLetter)
+        }
+    }
     $phase = 'drive'
     Write-KitLog -Level STEP -Message '1. Contrôle de la clé'
     if (-not $DriveLetter) {
@@ -181,6 +241,20 @@ try {
     $keyRoot = $drive.Root
     $freeBefore = $drive.FreeBytes
 
+    if ($MettreAJourVentoy) {
+        $phase = 'ventoy'
+        $dn = (Get-Partition -DriveLetter ([char]$DriveLetter)).DiskNumber
+        [void](Assert-KitVentoyTarget -DiskNumber $dn)
+        if ($DryRun) { Write-KitLog -Level WARN -Message "Simulation : Ventoy serait mis à jour sur le disque $dn (sans effacement)." }
+        else {
+            if (-not (Test-KitAdmin)) { throw 'La mise à jour de Ventoy nécessite les droits administrateur.' }
+            $ventoy = Save-KitVentoy -ToolsDir (Join-Path ([IO.Path]::GetTempPath()) 'kit-ventoy-ventoy')
+            Invoke-KitVentoy2Disk -Exe $ventoy.Exe -Mode Update -DiskNumber $dn -Confirm:$false
+            [void](Wait-KitVentoyVolume -DiskNumber $dn -Label $config.VolumeLabel)
+            Add-KitResult -Name 'Ventoy' -Status 'OK' -Detail ("Ventoy mis à jour en {0} (données conservées)" -f $ventoy.Version)
+        }
+        $phase = 'drive'
+    }
     $cacheRoot = $CachePath
     if (-not $cacheRoot) { $cacheRoot = Join-Path $kitRoot 'cache' }
     $cacheRoot = [IO.Path]::GetFullPath($cacheRoot)
