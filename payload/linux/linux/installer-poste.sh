@@ -171,7 +171,9 @@ en_session() {
   [ -n "${DISPLAY:-}" ] && ecran+=("DISPLAY=$DISPLAY")
   [ -n "${WAYLAND_DISPLAY:-}" ] && ecran+=("WAYLAND_DISPLAY=$WAYLAND_DISPLAY")
   [ -n "${XAUTHORITY:-}" ] && ecran+=("XAUTHORITY=$XAUTHORITY")
-  sudo -u "$UTILISATEUR" -H env XDG_RUNTIME_DIR="/run/user/$uid" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$uid/bus" "${ecran[@]}" bash -lc "$*"
+  # Dossiers propres à l'utilisateur (aucune configuration héritée d'un autre compte)
+  sudo -u "$UTILISATEUR" -H env -u XDG_CONFIG_HOME -u XDG_DATA_HOME -u XDG_CACHE_HOME -u CONTAINERS_CONF -u CONTAINERS_STORAGE_CONF \
+    HOME="$HOME_UTILISATEUR" XDG_RUNTIME_DIR="/run/user/$uid" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$uid/bus" "${ecran[@]}" bash -lc "$*"
 }
 
 PAQ_A_JOUR=0
