@@ -7,6 +7,13 @@ la [gestion sémantique de version](https://semver.org/lang/fr/) (`MAJEUR.MINEUR
 
 ## [Non publié]
 
+### Prévu
+
+- Profils par système et par usage : Windows / Ubuntu, bureautique / développement.
+- Kit utilisable depuis Linux.
+
+## [1.1.0] - 2026-10-10
+
 ### Ajouté
 
 - Installation de Ventoy sur une clé neuve depuis l'assistant ou `-InstallerVentoy -Disque N` : release
@@ -17,10 +24,10 @@ la [gestion sémantique de version](https://semver.org/lang/fr/) (`MAJEUR.MINEUR
   droits administrateur, sauvegarde préalable de toutes les partitions du disque.
 - Libellé « Système (menu Ventoy) » pour les ISO dans l'assistant.
 
-### Prévu
+### Remarque
 
-- Profils par usage : bureautique, développement, statistiques (Windows et Linux).
-- Noms lisibles dans le menu Ventoy (`menu_alias`) et persistance pour les systèmes Linux.
+- Garde-fous et téléchargement de Ventoy testés ; l'installation réelle sur une clé sera validée lors du test
+  de la clé Linux.
 
 ## [1.0.0] - 2026-10-10
 
@@ -52,5 +59,6 @@ Première version stable : clé Windows 11 complète, installable hors ligne.
 - Version unique (`VERSION`) affichée dans les fenêtres, les journaux et sur la clé.
 - Intégration continue : PSScriptAnalyzer, syntaxe PowerShell 5.1, lecture des profils et langues.
 
-[Non publié]: https://github.com/dreamdogbo/kit-ventoy/compare/v1.0.0...HEAD
+[Non publié]: https://github.com/dreamdogbo/kit-ventoy/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/dreamdogbo/kit-ventoy/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/dreamdogbo/kit-ventoy/releases/tag/v1.0.0
