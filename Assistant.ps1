@@ -44,6 +44,7 @@ Add-Type -AssemblyName System.Drawing
 $kitRoot = $PSScriptRoot
 Import-Module (Join-Path $kitRoot 'modules\Report.psm1') -Force -DisableNameChecking
 Import-Module (Join-Path $kitRoot 'modules\Drive.psm1') -Force -DisableNameChecking
+Import-Module (Join-Path $kitRoot 'modules\Ventoy.psm1') -Force -DisableNameChecking
 Import-Module (Join-Path $kitRoot 'payload\windows\postinstall\KitUi.psm1') -Force -DisableNameChecking
 
 $script:Process = $null
@@ -54,6 +55,9 @@ $script:TotalLabel = $null
 $script:LogBox = $null
 $script:Restart = $false
 $script:LangCodes = @()
+$script:DriveItems = @()
+$script:ChkInstallVentoy = $null
+$script:ChkUpdateVentoy = $null
 
 # --------------------------------------------------------------------------- langue de l'interface
 $langDir = Join-Path $kitRoot 'lang'
@@ -133,10 +137,26 @@ function Update-DriveList {
         Recherche les clés Ventoy branchées et remplit la liste déroulante.
     #>
     $script:DriveCombo.Items.Clear()
+    $script:DriveItems = @()
+    if ($script:ChkInstallVentoy -and $script:ChkInstallVentoy.Checked) {
+        # Clé neuve : disques USB/SD éligibles (jamais le disque système : filtré par Get-KitUsbDisk)
+        foreach ($u in @(Get-KitUsbDisk)) {
+            $state = if ($u.IsVentoy) { T 'UsbVentoy' } else { T 'UsbNotVentoy' }
+            $letters = (@($u.Letters | ForEach-Object { "${_}:" }) -join ' ')
+            [void]$script:DriveCombo.Items.Add(((T 'UsbDiskFormat') -f $u.Number, $u.Model, $u.SizeGB, ("$state $letters").Trim()))
+            $script:DriveItems += $u
+        }
+        $script:DriveCombo.ForeColor = (Get-KitUiTheme).Danger
+        if ($script:DriveCombo.Items.Count -eq 0) { [void]$script:DriveCombo.Items.Add((T 'NoUsbDisk')) }
+        $script:DriveCombo.SelectedIndex = 0
+        return
+    }
+    $script:DriveCombo.ForeColor = [System.Drawing.SystemColors]::WindowText
     $label = 'Ventoy'
     if ($script:ProfileCombo.SelectedIndex -ge 0) { $label = $script:Profiles[$script:ProfileCombo.SelectedIndex].Data.VolumeLabel }
     foreach ($d in @(Find-KitVentoyDrive -ExpectedLabel $label)) {
         [void]$script:DriveCombo.Items.Add(((T 'DriveFormat') -f $d.Root, $d.Label, $d.FreeGB, $d.TotalGB))
+        $script:DriveItems += $d
     }
     if ($script:DriveCombo.Items.Count -gt 0) { $script:DriveCombo.SelectedIndex = 0 }
     else { [void]$script:DriveCombo.Items.Add((T 'NoDrive')); $script:DriveCombo.SelectedIndex = 0 }
@@ -172,11 +192,12 @@ function Update-ItemList {
         $size = 0; if ($it.ContainsKey('EstimatedSizeMB')) { $size = [int]$it.EstimatedSizeMB }
         $lvi = New-Object System.Windows.Forms.ListViewItem($it.Name, $groups[$cat])
         [void]$lvi.SubItems.Add($(if ($size -ge 1024) { (T 'UnitGB') -f ($size / 1024) } else { (T 'UnitMB') -f $size }))
-        [void]$lvi.SubItems.Add($(if ($mode -eq 'Manuel') { (T 'UsageManual') } else { (T 'UsageAuto') }))
+        $isSystem = $it.Type -in @('WindowsIso', 'LinuxIso')
+        [void]$lvi.SubItems.Add($(if ($isSystem) { (T 'UsageSystem') } elseif ($mode -eq 'Manuel') { (T 'UsageManual') } else { (T 'UsageAuto') }))
         [void]$lvi.SubItems.Add([string]$it.Type)
         $lvi.Checked = -not ($it.ContainsKey('Default') -and -not $it.Default)
         $lvi.Tag = $it
-        $lvi.ImageKey = $(if ($it.Type -eq 'WindowsIso') { 'system' } elseif ($mode -eq 'Manuel') { 'tool' } else { 'package' })
+        $lvi.ImageKey = $(if ($isSystem) { 'system' } elseif ($mode -eq 'Manuel') { 'tool' } else { 'package' })
         [void]$script:ItemList.Items.Add($lvi)
     }
     $script:ItemList.EndUpdate()
@@ -221,11 +242,22 @@ function Start-Build {
     param([bool] $Simulation)
     $selected = @($script:ItemList.CheckedItems | ForEach-Object { $_.Text })
     if ($selected.Count -eq 0) { [void][System.Windows.Forms.MessageBox]::Show((T 'NeedOneItem'), 'Kit Ventoy'); return }
-    $driveText = [string]$script:DriveCombo.SelectedItem
-    if ($driveText -notmatch '^([A-Z]):\\') { [void][System.Windows.Forms.MessageBox]::Show((T 'NeedDrive'), 'Kit Ventoy'); return }
-    $letter = $Matches[1]
+    $installVentoy = $script:ChkInstallVentoy.Checked
+    $idx = $script:DriveCombo.SelectedIndex
+    if ($idx -lt 0 -or $idx -ge $script:DriveItems.Count) { [void][System.Windows.Forms.MessageBox]::Show((T 'NeedDrive'), 'Kit Ventoy'); return }
+    $target = $script:DriveItems[$idx]
+    $letter = ''
+    if (-not $installVentoy) { $letter = [string]$target.Letter }
     if ($script:ChkBackup.Checked -and -not $script:BackupPath.Text) { [void][System.Windows.Forms.MessageBox]::Show((T 'NeedBackupPath'), 'Kit Ventoy'); return }
-    if (-not $Simulation) {
+    if ($installVentoy -and -not $Simulation) {
+        # Effacement : confirmation tapée obligatoire
+        Add-Type -AssemblyName Microsoft.VisualBasic
+        $word = T 'ConfirmWord'
+        $typed = [Microsoft.VisualBasic.Interaction]::InputBox(((T 'ConfirmText') -f $target.Number, $target.Model, $target.SizeGB, $word), (T 'ConfirmTitle'), '')
+        if ($typed -cne $word) { [void][System.Windows.Forms.MessageBox]::Show((T 'ConfirmWrong'), 'Kit Ventoy'); return }
+        [void][System.Windows.Forms.MessageBox]::Show((T 'AdminNeeded'), 'Kit Ventoy')
+    }
+    elseif (-not $Simulation) {
         $msg = (T 'ConfirmBuild') -f $letter, $selected.Count
         if ([System.Windows.Forms.MessageBox]::Show($msg, 'Kit Ventoy', 'YesNo', 'Question') -ne 'Yes') { return }
     }
@@ -238,7 +270,10 @@ function Start-Build {
 
     $p = $script:Profiles[$script:ProfileCombo.SelectedIndex]
     $argList = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ('"{0}"' -f (Join-Path $kitRoot 'Build-Kit.ps1')),
-        '-Profil', $p.Name, '-DriveLetter', $letter, '-Only', ($selected -join ','), '-LogFile', ('"{0}"' -f $script:LogPath))
+        '-Profil', $p.Name, '-Only', ($selected -join ','), '-LogFile', ('"{0}"' -f $script:LogPath))
+    if ($installVentoy) { $argList += @('-InstallerVentoy', '-Disque', $target.Number, '-ConfirmerEffacement', ("EFFACER-{0}" -f $target.Number)) }
+    else { $argList += @('-DriveLetter', $letter) }
+    if ($script:ChkUpdateVentoy.Checked -and -not $installVentoy) { $argList += '-MettreAJourVentoy' }
     if ($Simulation) { $argList += '-DryRun' }
     if ($script:LangCombo.SelectedIndex -ge 0 -and $script:LangCodes.Count -gt 0) { $argList += @('-Langue', $script:LangCodes[$script:LangCombo.SelectedIndex]) }
     if (-not $script:ChkSignature.Checked) { $argList += '-SansVerifSignature' }
@@ -249,7 +284,10 @@ function Start-Build {
     if ($script:IsoUrl.Text.Trim()) { $argList += @('-WindowsIsoUrl', ('"{0}"' -f $script:IsoUrl.Text.Trim())) }
 
     $hostExe = (Get-Process -Id $PID).Path
-    $script:Process = Start-Process -FilePath $hostExe -ArgumentList $argList -WindowStyle Hidden -PassThru
+    $sp = @{ FilePath = $hostExe; ArgumentList = $argList; WindowStyle = 'Hidden'; PassThru = $true }
+    # Ventoy (installation ou mise à jour) : droits administrateur requis
+    if (($installVentoy -or $script:ChkUpdateVentoy.Checked) -and -not $Simulation -and -not (Test-KitAdmin)) { $sp['Verb'] = 'RunAs' }
+    $script:Process = Start-Process @sp
     Add-LogLine -Line ((T 'Starting') -f (($argList | Select-Object -Skip 5) -join ' '))
     Set-Running -Running $true
     $script:Timer.Start()
@@ -313,9 +351,19 @@ $script:BtnRefresh.Add_Click({ Update-DriveList })
 $form.Controls.Add($script:BtnRefresh)
 $lnkVentoy = New-Object System.Windows.Forms.LinkLabel
 $lnkVentoy.Text = (T 'GetVentoy')
-$lnkVentoy.Location = New-Object System.Drawing.Point(820, 148); $lnkVentoy.Size = New-Object System.Drawing.Size(290, 22)
+$lnkVentoy.Location = New-Object System.Drawing.Point(820, 114); $lnkVentoy.Size = New-Object System.Drawing.Size(290, 22)
 $lnkVentoy.Add_LinkClicked({ Start-Process 'https://www.ventoy.net/fr/download.html' })
 $form.Controls.Add($lnkVentoy)
+$script:ChkInstallVentoy = New-Object System.Windows.Forms.CheckBox
+$script:ChkInstallVentoy.Text = (T 'InstallVentoy')
+$script:ChkInstallVentoy.Location = New-Object System.Drawing.Point(815, 138); $script:ChkInstallVentoy.Size = New-Object System.Drawing.Size(300, 22)
+$script:ChkInstallVentoy.Add_CheckedChanged({ if ($script:ChkInstallVentoy.Checked) { $script:ChkUpdateVentoy.Checked = $false }; Update-DriveList })
+$form.Controls.Add($script:ChkInstallVentoy)
+$script:ChkUpdateVentoy = New-Object System.Windows.Forms.CheckBox
+$script:ChkUpdateVentoy.Text = (T 'UpdateVentoy')
+$script:ChkUpdateVentoy.Location = New-Object System.Drawing.Point(815, 158); $script:ChkUpdateVentoy.Size = New-Object System.Drawing.Size(300, 22)
+$script:ChkUpdateVentoy.Add_CheckedChanged({ if ($script:ChkUpdateVentoy.Checked -and $script:ChkInstallVentoy.Checked) { $script:ChkInstallVentoy.Checked = $false } })
+$form.Controls.Add($script:ChkUpdateVentoy)
 
 # Liste des éléments
 $script:ItemList = New-Object System.Windows.Forms.ListView
@@ -441,7 +489,10 @@ $script:Timer.Add_Tick({
         if ($script:Process -and $script:Process.HasExited) {
             $script:Timer.Stop()
             Read-NewLogLine
-            $code = $script:Process.ExitCode
+            # Processus élevé : le code de sortie peut être illisible, le journal fait alors foi
+            $code = -1
+            try { $code = $script:Process.ExitCode } catch { Write-Verbose 'Code de sortie indisponible.' }
+            if ($code -eq -1) { $last = ((Get-Content -LiteralPath $script:LogPath -Tail 6 -ErrorAction SilentlyContinue) -join ' '); if ($last -match '0 ÉCHEC') { $code = 0 } }
             Set-Running -Running $false
             $texte = switch ($code) {
                 0 { (T 'Done0') }
