@@ -1,9 +1,9 @@
 ﻿# Key creation wizard texts — English
 @{
     LangName        = 'English'
-    WindowTitle     = 'Ventoy Kit — Prepare an installation USB key'
-    Title           = 'Prepare a ready-to-use Ventoy key'
-    Intro           = '1. Key type  2. Key  3. Software  4. "Build the key". The key is only wiped if "New key" is checked.'
+    WindowTitle     = 'Alchemist — Prepare an installation USB key'
+    Title           = 'Alchemist — turn a bare PC into a ready-to-use workstation'
+    Intro           = '1. System and usage  2. Versions and software  3. Key  4. "Build the key". The key is only wiped if "New key" is checked.'
     InterfaceLang   = 'Langue / Language:'
     ProfileLabel    = 'Key type:'
     ContentLang     = 'System language:'
@@ -63,4 +63,9 @@
     ConfirmWord     = 'ERASE'
     ConfirmWrong    = 'Wrong confirmation: the key was not modified.'
     AdminNeeded     = 'Windows will ask for administrator permission (required for Ventoy).'
+    SystemLabel     = 'System:'
+    UsageLabel      = 'Usage:'
+    UsageBureautique   = 'Office'
+    UsageDeveloppement = 'Development'
+    LinuxHint       = 'Linux: software (office, development…) is chosen on the workstation with linux/lancer.sh.'
 }

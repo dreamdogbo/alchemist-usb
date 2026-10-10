@@ -45,12 +45,18 @@ $kitRoot = $PSScriptRoot
 Import-Module (Join-Path $kitRoot 'modules\Report.psm1') -Force -DisableNameChecking
 Import-Module (Join-Path $kitRoot 'modules\Drive.psm1') -Force -DisableNameChecking
 Import-Module (Join-Path $kitRoot 'modules\Ventoy.psm1') -Force -DisableNameChecking
+Import-Module (Join-Path $kitRoot 'modules\Profile.psm1') -Force -DisableNameChecking
 Import-Module (Join-Path $kitRoot 'payload\windows\postinstall\KitUi.psm1') -Force -DisableNameChecking
 
 $script:Process = $null
 $script:LogPath = ''
 $script:LogPos = 0L
 $script:Profiles = @()
+$script:Systems = @()
+$script:Usages = @()
+$script:SystemCombo = $null
+$script:Hint = $null
+$script:UsageCombo = $null
 $script:TotalLabel = $null
 $script:LogBox = $null
 $script:Restart = $false
@@ -131,6 +137,17 @@ function Read-NewLogLine {
     finally { if ($fs) { $fs.Dispose() } }
 }
 
+function Get-SelectedProfile {
+    <#
+    .SYNOPSIS
+        Profil correspondant au système et à l'usage choisis dans la fenêtre.
+    #>
+    if (-not $script:SystemCombo -or $script:SystemCombo.SelectedIndex -lt 0 -or $script:UsageCombo.SelectedIndex -lt 0) { return $null }
+    $sys = $script:Systems[$script:SystemCombo.SelectedIndex]
+    $use = $script:Usages[$script:UsageCombo.SelectedIndex]
+    return (@($script:Profiles | Where-Object { $_.Systeme -eq $sys -and $_.Usage -eq $use }) | Select-Object -First 1)
+}
+
 function Update-DriveList {
     <#
     .SYNOPSIS
@@ -153,7 +170,8 @@ function Update-DriveList {
     }
     $script:DriveCombo.ForeColor = [System.Drawing.SystemColors]::WindowText
     $label = 'Ventoy'
-    if ($script:ProfileCombo.SelectedIndex -ge 0) { $label = $script:Profiles[$script:ProfileCombo.SelectedIndex].Data.VolumeLabel }
+    $sel = Get-SelectedProfile
+    if ($sel) { $label = $sel.Data.VolumeLabel }
     foreach ($d in @(Find-KitVentoyDrive -ExpectedLabel $label)) {
         [void]$script:DriveCombo.Items.Add(((T 'DriveFormat') -f $d.Root, $d.Label, $d.FreeGB, $d.TotalGB))
         $script:DriveItems += $d
@@ -169,8 +187,10 @@ function Update-ItemList {
     #>
     $script:ItemList.BeginUpdate()
     $script:ItemList.Items.Clear(); $script:ItemList.Groups.Clear()
-    $p = $script:Profiles[$script:ProfileCombo.SelectedIndex]
+    $p = Get-SelectedProfile
+    if (-not $p) { return }
     $script:ProfileDesc.Text = $p.Data.Description
+    if ($script:Hint) { $script:Hint.Text = $(if ($p.Systeme -eq 'Linux') { T 'LinuxHint' } else { T 'FreeSuiteHint' }) }
     # Langues de contenu proposées par le profil (langue de l'interface présélectionnée si possible)
     $script:LangCombo.Items.Clear()
     $script:LangCodes = @()
@@ -229,7 +249,7 @@ function Set-Running {
         Bascule l'interface en mode « exécution en cours » ou « prête ».
     #>
     param([bool] $Running)
-    foreach ($c in @($script:BtnSimulate, $script:BtnBuild, $script:ProfileCombo, $script:DriveCombo, $script:ItemList, $script:BtnRefresh)) { $c.Enabled = -not $Running }
+    foreach ($c in @($script:BtnSimulate, $script:BtnBuild, $script:SystemCombo, $script:UsageCombo, $script:DriveCombo, $script:ItemList, $script:BtnRefresh)) { $c.Enabled = -not $Running }
     $script:BtnStop.Enabled = $Running
     if ($Running) { $script:Progress.Style = 'Marquee' } else { $script:Progress.Style = 'Blocks'; $script:Progress.Value = 0 }
 }
@@ -241,25 +261,25 @@ function Start-Build {
     #>
     param([bool] $Simulation)
     $selected = @($script:ItemList.CheckedItems | ForEach-Object { $_.Text })
-    if ($selected.Count -eq 0) { [void][System.Windows.Forms.MessageBox]::Show((T 'NeedOneItem'), 'Kit Ventoy'); return }
+    if ($selected.Count -eq 0) { [void][System.Windows.Forms.MessageBox]::Show((T 'NeedOneItem'), 'Alchemist'); return }
     $installVentoy = $script:ChkInstallVentoy.Checked
     $idx = $script:DriveCombo.SelectedIndex
-    if ($idx -lt 0 -or $idx -ge $script:DriveItems.Count) { [void][System.Windows.Forms.MessageBox]::Show((T 'NeedDrive'), 'Kit Ventoy'); return }
+    if ($idx -lt 0 -or $idx -ge $script:DriveItems.Count) { [void][System.Windows.Forms.MessageBox]::Show((T 'NeedDrive'), 'Alchemist'); return }
     $target = $script:DriveItems[$idx]
     $letter = ''
     if (-not $installVentoy) { $letter = [string]$target.Letter }
-    if ($script:ChkBackup.Checked -and -not $script:BackupPath.Text) { [void][System.Windows.Forms.MessageBox]::Show((T 'NeedBackupPath'), 'Kit Ventoy'); return }
+    if ($script:ChkBackup.Checked -and -not $script:BackupPath.Text) { [void][System.Windows.Forms.MessageBox]::Show((T 'NeedBackupPath'), 'Alchemist'); return }
     if ($installVentoy -and -not $Simulation) {
         # Effacement : confirmation tapée obligatoire
         Add-Type -AssemblyName Microsoft.VisualBasic
         $word = T 'ConfirmWord'
         $typed = [Microsoft.VisualBasic.Interaction]::InputBox(((T 'ConfirmText') -f $target.Number, $target.Model, $target.SizeGB, $word), (T 'ConfirmTitle'), '')
-        if ($typed -cne $word) { [void][System.Windows.Forms.MessageBox]::Show((T 'ConfirmWrong'), 'Kit Ventoy'); return }
-        [void][System.Windows.Forms.MessageBox]::Show((T 'AdminNeeded'), 'Kit Ventoy')
+        if ($typed -cne $word) { [void][System.Windows.Forms.MessageBox]::Show((T 'ConfirmWrong'), 'Alchemist'); return }
+        [void][System.Windows.Forms.MessageBox]::Show((T 'AdminNeeded'), 'Alchemist')
     }
     elseif (-not $Simulation) {
         $msg = (T 'ConfirmBuild') -f $letter, $selected.Count
-        if ([System.Windows.Forms.MessageBox]::Show($msg, 'Kit Ventoy', 'YesNo', 'Question') -ne 'Yes') { return }
+        if ([System.Windows.Forms.MessageBox]::Show($msg, 'Alchemist', 'YesNo', 'Question') -ne 'Yes') { return }
     }
 
     $logDir = Join-Path $kitRoot 'logs'
@@ -268,7 +288,7 @@ function Start-Build {
     $script:LogPos = 0L
     $script:LogBox.Clear()
 
-    $p = $script:Profiles[$script:ProfileCombo.SelectedIndex]
+    $p = Get-SelectedProfile
     $argList = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ('"{0}"' -f (Join-Path $kitRoot 'Build-Kit.ps1')),
         '-Profil', $p.Name, '-Only', ($selected -join ','), '-LogFile', ('"{0}"' -f $script:LogPath))
     if ($installVentoy) { $argList += @('-InstallerVentoy', '-Disque', $target.Number, '-ConfirmerEffacement', ("EFFACER-{0}" -f $target.Number)) }
@@ -307,12 +327,18 @@ if (Test-Path -LiteralPath (Join-Path $kitRoot 'VERSION')) { $kitVersion = (Get-
 [void](Add-KitHeader -Form $form -Title (T 'Title') -Subtitle (T 'Intro') -Glyph 'Usb' -Version $kitVersion)
 
 # Profil
-$form.Controls.Add((New-Label -Text (T 'ProfileLabel') -X 18 -Y 76 -W 155 -Bold))
-$script:ProfileCombo = New-Object System.Windows.Forms.ComboBox
-$script:ProfileCombo.DropDownStyle = 'DropDownList'
-$script:ProfileCombo.Location = New-Object System.Drawing.Point(175, 72); $script:ProfileCombo.Size = New-Object System.Drawing.Size(340, 24)
-$form.Controls.Add($script:ProfileCombo)
-$script:ProfileDesc = New-Label -Text '' -X 530 -Y 70 -W 570 -H 36
+# Étape 1 : système (Windows / Linux), étape 2 : usage (bureautique / développement)
+$form.Controls.Add((New-Label -Text (T 'SystemLabel') -X 18 -Y 76 -W 155 -Bold))
+$script:SystemCombo = New-Object System.Windows.Forms.ComboBox
+$script:SystemCombo.DropDownStyle = 'DropDownList'
+$script:SystemCombo.Location = New-Object System.Drawing.Point(175, 72); $script:SystemCombo.Size = New-Object System.Drawing.Size(140, 24)
+$form.Controls.Add($script:SystemCombo)
+$form.Controls.Add((New-Label -Text (T 'UsageLabel') -X 330 -Y 76 -W 70 -Bold))
+$script:UsageCombo = New-Object System.Windows.Forms.ComboBox
+$script:UsageCombo.DropDownStyle = 'DropDownList'
+$script:UsageCombo.Location = New-Object System.Drawing.Point(400, 72); $script:UsageCombo.Size = New-Object System.Drawing.Size(170, 24)
+$form.Controls.Add($script:UsageCombo)
+$script:ProfileDesc = New-Label -Text '' -X 585 -Y 70 -W 520 -H 36
 $script:ProfileDesc.Anchor = 'Top,Left,Right'
 $form.Controls.Add($script:ProfileDesc)
 
@@ -390,10 +416,10 @@ $form.Controls.Add($btnNone)
 $script:TotalLabel = New-Label -Text '' -X 278 -Y 443 -W 390
 $script:TotalLabel.Anchor = 'Bottom,Left'
 $form.Controls.Add($script:TotalLabel)
-$hint = New-Label -Text (T 'FreeSuiteHint') -X 18 -Y 466 -W 640
-$hint.ForeColor = $theme.Success
-$hint.Anchor = 'Bottom,Left'
-$form.Controls.Add($hint)
+$script:Hint = New-Label -Text (T 'FreeSuiteHint') -X 18 -Y 466 -W 640
+$script:Hint.ForeColor = $theme.Success
+$script:Hint.Anchor = 'Bottom,Left'
+$form.Controls.Add($script:Hint)
 
 # Options
 $grp = New-Object System.Windows.Forms.GroupBox
@@ -502,14 +528,14 @@ $script:Timer.Add_Tick({
             }
             $script:Status.Text = $texte
             Update-DriveList
-            [void][System.Windows.Forms.MessageBox]::Show($texte, 'Kit Ventoy', 'OK', $(if ($code -eq 0) { 'Information' } else { 'Warning' }))
+            [void][System.Windows.Forms.MessageBox]::Show($texte, 'Alchemist', 'OK', $(if ($code -eq 0) { 'Information' } else { 'Warning' }))
         }
     })
 
 $form.Add_FormClosing({
         param($s, $e)
         if ($script:Process -and -not $script:Process.HasExited) {
-            $r = [System.Windows.Forms.MessageBox]::Show((T 'CloseRunning'), 'Kit Ventoy', 'YesNoCancel', 'Question')
+            $r = [System.Windows.Forms.MessageBox]::Show((T 'CloseRunning'), 'Alchemist', 'YesNoCancel', 'Question')
             if ($r -eq 'Cancel') { $e.Cancel = $true }
             elseif ($r -eq 'No') { & taskkill.exe /PID $script:Process.Id /T /F | Out-Null }
         }
@@ -530,12 +556,18 @@ foreach ($c in $grp.Controls) { if ($c -is [System.Windows.Forms.Control]) { $c.
 
 # --------------------------------------------------------------------------- chargement
 $profileDir = Join-Path $kitRoot 'config\profils'
-$script:Profiles = @(Get-ChildItem -LiteralPath $profileDir -Filter '*.psd1' | Sort-Object Name | ForEach-Object {
-        [pscustomobject]@{ Name = $_.BaseName; Data = (Import-PowerShellDataFile -Path $_.FullName) }
-    })
-foreach ($p in $script:Profiles) { [void]$script:ProfileCombo.Items.Add($p.Data.Nom) }
-$script:ProfileCombo.Add_SelectedIndexChanged({ Update-ItemList })
-if ($script:Profiles.Count -gt 0) { $script:ProfileCombo.SelectedIndex = 0 }
+$script:Profiles = Get-KitProfileList -Directory $profileDir
+$script:Systems = @($script:Profiles | ForEach-Object Systeme | Select-Object -Unique)
+$script:Usages = @('Bureautique', 'Developpement')
+foreach ($s in $script:Systems) { [void]$script:SystemCombo.Items.Add($s) }
+foreach ($u in $script:Usages) { [void]$script:UsageCombo.Items.Add((T "Usage$u")) }
+$script:SystemCombo.Add_SelectedIndexChanged({ Update-ItemList })
+$script:UsageCombo.Add_SelectedIndexChanged({ Update-ItemList })
+if ($script:Profiles.Count -gt 0) {
+    # Système par défaut : celui de l'ordinateur (Windows ici) ; usage : bureautique
+    $script:UsageCombo.SelectedIndex = 0
+    $script:SystemCombo.SelectedIndex = [math]::Max(0, [array]::IndexOf($script:Systems, 'Windows'))
+}
 
 if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
     Add-LogLine -Line (T 'NoWinget')

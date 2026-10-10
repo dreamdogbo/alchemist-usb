@@ -1,7 +1,7 @@
 ﻿# Workstation wizard texts — English
 @{
     LangName      = 'English'
-    WindowTitle   = 'Ventoy Kit — Workstation setup'
+    WindowTitle   = 'Alchemist — Workstation setup'
     Title         = 'Install software on this computer'
     Intro         = 'Everything is installed from the key, without Internet. Check what you need, then "Install".'
     InterfaceLang = 'Langue / Language:'

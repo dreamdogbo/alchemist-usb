@@ -166,8 +166,8 @@ function Start-Tool {
         Lance un outil portable depuis la clé.
     #>
     param($Entry)
-    if (-not $Entry -or -not $Entry.Launcher) { [void][System.Windows.Forms.MessageBox]::Show((T 'SelectTool'), 'Kit Ventoy'); return }
-    if (-not (Test-Path -LiteralPath $Entry.Launcher)) { [void][System.Windows.Forms.MessageBox]::Show((T 'ToolMissing'), 'Kit Ventoy'); return }
+    if (-not $Entry -or -not $Entry.Launcher) { [void][System.Windows.Forms.MessageBox]::Show((T 'SelectTool'), 'Alchemist'); return }
+    if (-not (Test-Path -LiteralPath $Entry.Launcher)) { [void][System.Windows.Forms.MessageBox]::Show((T 'ToolMissing'), 'Alchemist'); return }
     Start-Process -FilePath $Entry.Launcher -WorkingDirectory (Split-Path -Parent $Entry.Launcher)
 }
 
@@ -178,12 +178,14 @@ function Start-CompleteKey {
         avec le kit présent à la racine de la clé (mêmes sources et vérifications).
     #>
     $keyRoot = Split-Path -Parent $here
-    $build = Join-Path $keyRoot 'kit-ventoy\Build-Kit.ps1'
+    # Moteur présent sur la clé (dossier alchemist-usb, ou kit-ventoy pour les anciennes clés)
+    $build = @(Get-ChildItem -LiteralPath $keyRoot -Directory -ErrorAction SilentlyContinue | ForEach-Object { Join-Path $_.FullName 'Build-Kit.ps1' } | Where-Object { Test-Path -LiteralPath $_ }) | Select-Object -First 1
+    if (-not $build) { $build = '' }
     $missing = @($script:Etat.Items | Where-Object { -not $_.OnKey } | ForEach-Object Name)
-    if (-not $script:Etat.Internet -or -not (Test-Path -LiteralPath $build) -or $missing.Count -eq 0) {
-        [void][System.Windows.Forms.MessageBox]::Show((T 'CompleteNone'), 'Kit Ventoy'); return
+    if (-not $script:Etat.Internet -or -not $build -or $missing.Count -eq 0) {
+        [void][System.Windows.Forms.MessageBox]::Show((T 'CompleteNone'), 'Alchemist'); return
     }
-    if ([System.Windows.Forms.MessageBox]::Show(((T 'CompleteAsk') -f ($missing -join ', ')), 'Kit Ventoy', 'YesNo', 'Question') -ne 'Yes') { return }
+    if ([System.Windows.Forms.MessageBox]::Show(((T 'CompleteAsk') -f ($missing -join ', ')), 'Alchemist', 'YesNo', 'Question') -ne 'Yes') { return }
     $cat = Get-Content -LiteralPath (Join-Path $here 'catalogue.json') -Raw -Encoding UTF8 | ConvertFrom-Json
     $profilName = 'windows11-bureautique'
     if ($cat.PSObject.Properties['Profile'] -and $cat.Profile) { $profilName = [string]$cat.Profile }
@@ -214,10 +216,10 @@ function Start-Install {
         Lance Install-Poste.ps1 avec la sélection.
     #>
     $sel = @($script:ItemList.CheckedItems | ForEach-Object { $_.Text })
-    if ($sel.Count -eq 0 -and -not $script:ChkSettings.Checked) { [void][System.Windows.Forms.MessageBox]::Show((T 'NothingChosen'), 'Kit Ventoy'); return }
+    if ($sel.Count -eq 0 -and -not $script:ChkSettings.Checked) { [void][System.Windows.Forms.MessageBox]::Show((T 'NothingChosen'), 'Alchemist'); return }
     $name = $script:NameBox.Text.Trim()
-    if ($name -and $name -notmatch '^(?![0-9]+$)[A-Za-z0-9-]{1,15}$') { [void][System.Windows.Forms.MessageBox]::Show((T 'BadName'), 'Kit Ventoy'); return }
-    if ([System.Windows.Forms.MessageBox]::Show(((T 'ConfirmRun') -f $sel.Count), 'Kit Ventoy', 'YesNo', 'Question') -ne 'Yes') { return }
+    if ($name -and $name -notmatch '^(?![0-9]+$)[A-Za-z0-9-]{1,15}$') { [void][System.Windows.Forms.MessageBox]::Show((T 'BadName'), 'Alchemist'); return }
+    if ([System.Windows.Forms.MessageBox]::Show(((T 'ConfirmRun') -f $sel.Count), 'Alchemist', 'YesNo', 'Question') -ne 'Yes') { return }
 
     $logDir = 'C:\PostInstall'
     if (-not (Test-Path -LiteralPath $logDir)) { New-Item -ItemType Directory -Path $logDir -Force | Out-Null }
@@ -369,14 +371,14 @@ $script:Timer.Add_Tick({
             $msg = if ($script:RunKind -eq 'complete') { (T 'CompleteDone') -f $code } elseif ($code -eq 0) { T 'Done0' } else { (T 'DoneFail') -f $code }
             $script:Status.Text = $msg
             Update-List
-            [void][System.Windows.Forms.MessageBox]::Show($msg, 'Kit Ventoy', 'OK', $(if ($code -eq 0) { 'Information' } else { 'Warning' }))
+            [void][System.Windows.Forms.MessageBox]::Show($msg, 'Alchemist', 'OK', $(if ($code -eq 0) { 'Information' } else { 'Warning' }))
         }
     })
 $form.Add_FormClosing({
         param($s, $e)
         [void]$s
         if ($script:Process -and -not $script:Process.HasExited) {
-            if ([System.Windows.Forms.MessageBox]::Show((T 'CloseRunning'), 'Kit Ventoy', 'YesNo', 'Question') -ne 'Yes') { $e.Cancel = $true }
+            if ([System.Windows.Forms.MessageBox]::Show((T 'CloseRunning'), 'Alchemist', 'YesNo', 'Question') -ne 'Yes') { $e.Cancel = $true }
         }
     })
 
