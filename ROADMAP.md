@@ -11,11 +11,11 @@ Les versions suivent [SemVer](https://semver.org/lang/fr/) ; l'avancement réel 
 
 ## v1.1 — La clé de A à Z
 
-- [ ] **Installer Ventoy** sur une clé vierge depuis l'assistant (release officielle `ventoy/Ventoy`,
+- [x] **Installer Ventoy** sur une clé vierge depuis l'assistant (release officielle `ventoy/Ventoy`,
       SHA256 vérifié, ligne de commande officielle `Ventoy2Disk VTOYCLI`), puis préparer le contenu
       **en une seule opération**.
-- [ ] **Mettre à jour Ventoy** sur une clé existante sans effacer les données (mode *Update*).
-- [ ] Garde-fous : disques USB uniquement, jamais le disque système, confirmation tapée, sauvegarde proposée.
+- [x] **Mettre à jour Ventoy** sur une clé existante sans effacer les données (mode *Update*).
+- [x] Garde-fous : disques USB uniquement, jamais le disque système, confirmation tapée, sauvegarde proposée.
 - [ ] Menu Ventoy lisible (`menu_alias`) : « Windows 11 (FR) », « Ubuntu 26.04 LTS »…
 
 ## v1.2 — Profils par usage (Windows)

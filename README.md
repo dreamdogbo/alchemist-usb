@@ -70,8 +70,9 @@ Un simple `git pull` récupère les évolutions du kit ; relancer l'assistant me
 **Prérequis** : un PC Windows 10/11 avec Internet, [winget](https://learn.microsoft.com/windows/package-manager/winget/)
 (« App Installer », présent par défaut sur Windows 11) et une clé USB de **32 Go** ou plus.
 
-1. **Installer Ventoy sur la clé** (une seule fois) avec l'outil officiel :
-   [ventoy.net](https://www.ventoy.net/fr/download.html) → `Ventoy2Disk.exe` → *Installer*.
+1. **Ventoy** : soit vous l'installez vous-même avec l'outil officiel ([ventoy.net](https://www.ventoy.net/fr/download.html)),
+   soit vous cochez **« Clé neuve : installer Ventoy »** dans l'assistant : le kit télécharge la release officielle
+   (SHA256 vérifié), l'installe sur la clé choisie **après confirmation tapée**, puis prépare tout le reste.
 2. **Récupérer le kit** :
 
    ```powershell
@@ -128,6 +129,8 @@ Un simple `git pull` récupère les évolutions du kit ; relancer l'assistant me
 .\Build-Kit.ps1 -SauvegardeVers D:\Sauvegardes            # sauvegarder d'abord les fichiers de la clé
 .\Build-Kit.ps1 -SansVerifSignature                       # ne pas exiger les signatures Authenticode
 .\Build-Kit.ps1 -ListerProfils                            # types de clé disponibles
+.\Build-Kit.ps1 -InstallerVentoy -Disque 2 -ConfirmerEffacement EFFACER-2   # clé neuve : Ventoy + contenu
+.\Build-Kit.ps1 -MettreAJourVentoy                        # mettre Ventoy à jour, données conservées
 ```
 
 | Paramètre | Rôle |
@@ -142,6 +145,8 @@ Un simple `git pull` récupère les évolutions du kit ; relancer l'assistant me
 | `-SansVerifSignature` | Authenticode non exigé (les SHA256 publiés restent vérifiés) |
 | `-SauvegardeVers <dossier>` `[-SauvegardeComplete]` | sauvegarde préalable (fichiers personnels ou toute la clé) |
 | `-WindowsIsoUrl <url>` | lien officiel Microsoft si Fido est bloqué |
+| `-InstallerVentoy -Disque N -ConfirmerEffacement EFFACER-N` | installe Ventoy (EFFACE le disque N, USB uniquement, administrateur) puis prépare la clé ; options `-VentoyGPT`, `-VentoyFS NTFS`, `-VentoySansSecureBoot` |
+| `-MettreAJourVentoy` | met à jour Ventoy sur la clé, sans effacer les données |
 | `-CachePath`, `-LogFile` | zone de préparation, journal imposé |
 
 Codes de sortie : `0` OK · `1` au moins un ÉCHEC · `2` clé invalide/erreur · `3` source officielle du système ou d'Office introuvable.
@@ -194,8 +199,11 @@ dans la liste « Type de clé » de l'assistant.
 - **Antivirus** : Microsoft Defender (intégré à Windows 11) assure la protection en temps réel ; le kit ajoute **ClamAV**
   (open source) pour les analyses à la demande, configuré automatiquement (signatures mises à jour dès qu'Internet est
   disponible). Deux antivirus temps réel simultanés sont volontairement évités (conflits, lenteurs).
-- **La clé n'est jamais formatée ni repartitionnée** ; seuls les fichiers listés dans le MANIFEST sont
-  remplacés ou supprimés. Un fichier personnel au même emplacement n'est jamais écrasé.
+- **Préparer ou mettre à jour une clé ne la formate jamais** : seuls les fichiers listés dans le MANIFEST sont
+  remplacés ou supprimés ; un fichier personnel au même emplacement n'est jamais écrasé.
+- **Clé neuve (option)** : l'installation de Ventoy efface le disque choisi. Garde-fous : disques USB/SD uniquement,
+  jamais le disque système ni celui où se trouve le kit, confirmation tapée (`EFFACER-<n>`), droits administrateur,
+  sauvegarde proposée ; Ventoy officiel vérifié par SHA256.
 
 ## Architecture du projet
 
@@ -225,7 +233,7 @@ kit-ventoy/
 ## Feuille de route
 
 - [x] **v1.0** : Windows 11 + Office/LibreOffice/ONLYOFFICE + logiciels + pilotes + ClamAV, hors ligne, fenêtres FR/EN, multiboot Linux.
-- [ ] **v1.1** : installer / mettre à jour **Ventoy** depuis l'assistant, puis tout le reste en une seule opération.
+- [x] **v1.1** : installer / mettre à jour **Ventoy** depuis l'assistant, puis tout le reste en une seule opération.
 - [ ] **v1.2** : profils par usage (bureautique, développement, statistiques, graphisme/vidéo).
 - [ ] **v2.0** : outil **universel** (créer la clé depuis Windows, Linux ou macOS : moteur PowerShell 7, interface multiplateforme).
 - [ ] **v2.x** : Linux de première classe (installation automatisée, profil développeur : Docker, VS Code, langages ;
