@@ -166,7 +166,12 @@ en_utilisateur() {
 en_session() {
   if [ "$SIMULATION" -eq 1 ]; then echo "  [simulation] ($UTILISATEUR, session) $*"; return 0; fi
   local uid; uid="$(id -u "$UTILISATEUR")"
-  sudo -u "$UTILISATEUR" -H env XDG_RUNTIME_DIR="/run/user/$uid" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$uid/bus" bash -lc "$*"
+  # L'écran est transmis (FreeRDP en a besoin pour installer et afficher Office)
+  local ecran=()
+  [ -n "${DISPLAY:-}" ] && ecran+=("DISPLAY=$DISPLAY")
+  [ -n "${WAYLAND_DISPLAY:-}" ] && ecran+=("WAYLAND_DISPLAY=$WAYLAND_DISPLAY")
+  [ -n "${XAUTHORITY:-}" ] && ecran+=("XAUTHORITY=$XAUTHORITY")
+  sudo -u "$UTILISATEUR" -H env XDG_RUNTIME_DIR="/run/user/$uid" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$uid/bus" "${ecran[@]}" bash -lc "$*"
 }
 
 PAQ_A_JOUR=0
