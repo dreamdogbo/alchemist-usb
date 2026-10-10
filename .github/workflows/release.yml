@@ -29,9 +29,9 @@ jobs:
           echo "**Installation** : télécharger l'archive ci-dessous, la décompresser, double-cliquer \`Creer-Cle.bat\`." >> notes.md
 
       - name: Archive du kit
-        run: git archive --format=zip --prefix="kit-ventoy/" -o "kit-ventoy-${GITHUB_REF_NAME}.zip" HEAD
+        run: git archive --format=zip --prefix="alchemist/" -o "alchemist-${GITHUB_REF_NAME}.zip" HEAD
 
       - name: Créer la release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" "kit-ventoy-${GITHUB_REF_NAME}.zip" --title "Kit Ventoy $GITHUB_REF_NAME" --notes-file notes.md
+        run: gh release create "$GITHUB_REF_NAME" "alchemist-${GITHUB_REF_NAME}.zip" --title "Alchemist $GITHUB_REF_NAME" --notes-file notes.md
