@@ -37,6 +37,9 @@ Première version stable : clé Windows 11 complète, installable hors ligne.
 - Modèle d'installation Windows hors ligne (compte local) proposé par Ventoy.
 - Idempotence (MANIFEST.sha256), reprise des téléchargements, budget d'espace par priorité.
 - Conservation de l'ISO Windows présente sur la clé si Microsoft bloque temporairement Fido.
+- Pilotes : liens officiels validés par fabricant (Dell, HP, Lenovo, ASUS, Acer, MSI, Surface) et par
+  composant (Intel, AMD, NVIDIA), fabricant détecté automatiquement ; menu « Pilotes » de l'assistant.
+- Rejet des pages web renvoyées à la place d'un fichier (miroirs, captchas).
 - Version unique (`VERSION`) affichée dans les fenêtres, les journaux et sur la clé.
 - Intégration continue : PSScriptAnalyzer, syntaxe PowerShell 5.1, lecture des profils et langues.
 
