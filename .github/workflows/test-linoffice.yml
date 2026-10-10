@@ -51,7 +51,7 @@ jobs:
         run: sudo -u testeur -H env XDG_RUNTIME_DIR="/run/user/$(id -u testeur)" DISPLAY=:99 bash -lc '~/.local/bin/linoffice/setup.sh --healthcheck'
 
       - name: Ouvrir Word, Excel et PowerPoint, captures d'écran
-        if: always()
+        if: success()
         run: |
           mkdir -p captures
           for app in word excel powerpoint; do
