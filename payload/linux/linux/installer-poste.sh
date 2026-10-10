@@ -409,13 +409,13 @@ comp_edge() {
 comp_m365web() {
   command -v microsoft-edge >/dev/null 2>&1 || comp_edge
   local apps=(
-    "word|Word (Microsoft 365)|https://www.office.com/launch/word|x-office-document"
-    "excel|Excel (Microsoft 365)|https://www.office.com/launch/excel|x-office-spreadsheet"
-    "powerpoint|PowerPoint (Microsoft 365)|https://www.office.com/launch/powerpoint|x-office-presentation"
-    "outlook|Outlook (Microsoft 365)|https://outlook.office.com/mail/|mail-client"
-    "teams|Teams (Microsoft 365)|https://teams.microsoft.com/|internet-group-chat"
-    "onedrive|OneDrive (Microsoft 365)|https://www.office.com/launch/onedrive|folder-remote"
-    "office|Microsoft 365|https://www.office.com/|applications-office"
+    "teams|Teams|https://teams.microsoft.com/|internet-group-chat"
+    "onedrive|OneDrive|https://www.office.com/launch/onedrive|folder-remote"
+    "office|Microsoft 365 (portail en ligne)|https://www.office.com/|applications-office"
+    "word|Word (en ligne)|https://www.office.com/launch/word|x-office-document"
+    "excel|Excel (en ligne)|https://www.office.com/launch/excel|x-office-spreadsheet"
+    "powerpoint|PowerPoint (en ligne)|https://www.office.com/launch/powerpoint|x-office-presentation"
+    "outlook|Outlook (en ligne)|https://outlook.office.com/mail/|mail-client"
   )
   local a id nom url icone fichier
   for a in "${apps[@]}"; do
