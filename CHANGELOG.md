@@ -7,10 +7,19 @@ la [gestion sémantique de version](https://semver.org/lang/fr/) (`MAJEUR.MINEUR
 
 ## [Non publié]
 
+### Ajouté
+
+- Installation de Ventoy sur une clé neuve depuis l'assistant ou `-InstallerVentoy -Disque N` : release
+  officielle `ventoy/Ventoy` (SHA256 vérifié), ligne de commande officielle, puis préparation du contenu en une
+  seule opération.
+- Mise à jour de Ventoy sans effacement (`-MettreAJourVentoy` / case de l'assistant).
+- Garde-fous : disques USB/SD uniquement, jamais le disque système ni celui du kit, confirmation tapée,
+  droits administrateur, sauvegarde préalable de toutes les partitions du disque.
+- Libellé « Système (menu Ventoy) » pour les ISO dans l'assistant.
+
 ### Prévu
 
 - Profils par usage : bureautique, développement, statistiques (Windows et Linux).
-- Mise à jour de Ventoy sur la clé depuis la release officielle vérifiée (mode *Update*, sans effacement).
 - Noms lisibles dans le menu Ventoy (`menu_alias`) et persistance pour les systèmes Linux.
 
 ## [1.0.0] - 2026-10-10
