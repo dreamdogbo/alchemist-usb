@@ -179,7 +179,9 @@ paquets() {
   local manquants=() p
   for p in $liste; do
     paq_present "$p" && continue
-    if paq_existe "$p"; then manquants+=("$p"); else jaune "  (paquet indisponible sur $DISTRO : $p)"; fi
+    if paq_existe "$p"; then manquants+=("$p")
+    elif [ "$SIMULATION" -eq 1 ]; then manquants+=("$p")   # dépôt tiers pas encore ajouté en simulation
+    else jaune "  (paquet indisponible sur $DISTRO : $p)"; fi
   done
   [ "${#manquants[@]}" -eq 0 ] && { echo "  déjà installé : $liste"; return 0; }
   if [ "$FAMILLE" = "deb" ]; then lancer apt-get install -y --no-install-recommends "${manquants[@]}"
@@ -265,7 +267,7 @@ comp_base() {
   paq_maj
   if [ "$FAMILLE" = "deb" ]; then lancer apt-get -y full-upgrade; else lancer dnf -y upgrade --refresh; fi
   paquets "curl wget ca-certificates gnupg apt-transport-https git unzip p7zip-full zip tree htop btop jq python3 ncdu" \
-          "curl wget ca-certificates gnupg2 dnf-plugins-core git unzip p7zip p7zip-plugins zip tree htop btop jq python3 ncdu"
+          "curl wget2-wget ca-certificates gnupg2 dnf-plugins-core git unzip 7zip zip tree htop btop jq python3 ncdu"
   if [ -n "${KIT_TZ:-}" ]; then lancer timedatectl set-timezone "$KIT_TZ" || true; fi
 }
 
@@ -314,7 +316,7 @@ comp_polices() {
     [ "$SIMULATION" -eq 1 ] || echo "ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select true" | debconf-set-selections
   fi
   paquets "ttf-mscorefonts-installer fonts-crosextra-carlito fonts-crosextra-caladea fonts-liberation fonts-noto-color-emoji fonts-firacode" \
-          "google-carlito-fonts google-crosextra-caladea-fonts liberation-fonts google-noto-emoji-fonts fira-code-fonts"
+          "google-carlito-fonts google-crosextra-caladea-fonts liberation-fonts-all google-noto-emoji-fonts fira-code-fonts"
 }
 
 comp_bureau() {
@@ -325,7 +327,7 @@ comp_bureau() {
 }
 
 comp_securite() {
-  paquets "clamav clamav-daemon clamtk keepassxc ufw" "clamav clamav-update clamtk keepassxc firewalld"
+  paquets "clamav clamav-daemon clamtk keepassxc ufw" "clamav clamav-update clamav-freshclam clamtk keepassxc firewalld"
   if [ "$FAMILLE" = "deb" ]; then
     lancer ufw default deny incoming; lancer ufw default allow outgoing; lancer ufw --force enable
     lancer systemctl enable --now clamav-freshclam || true
