@@ -1,7 +1,7 @@
 ﻿# Textes de l'assistant du poste — Français
 @{
     LangName      = 'Français'
-    WindowTitle   = 'Kit Ventoy — Installation du poste'
+    WindowTitle   = 'Alchemist — Installation du poste'
     Title         = 'Installer les logiciels sur ce poste'
     Intro         = 'Tout est installé depuis la clé, sans Internet. Cochez ce qu''il faut, puis « Installer ».'
     InterfaceLang = 'Langue / Language :'

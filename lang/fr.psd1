@@ -2,9 +2,9 @@
 # Pour ajouter une langue : copier ce fichier en <code>.psd1 (ex. es.psd1) et traduire les valeurs.
 @{
     LangName        = 'Français'
-    WindowTitle     = 'Kit Ventoy — Préparation d''une clé d''installation'
-    Title           = 'Préparer une clé Ventoy prête à l''emploi'
-    Intro           = '1. Type de clé  2. Clé  3. Logiciels  4. « Créer la clé ». La clé n''est effacée que si « Clé neuve » est coché.'
+    WindowTitle     = 'Alchemist — Préparation d''une clé d''installation'
+    Title           = 'Alchemist — transformez un PC nu en poste prêt à l''emploi'
+    Intro           = '1. Système et usage  2. Versions et logiciels  3. Clé  4. « Créer la clé ». La clé n''est effacée que si « Clé neuve » est coché.'
     InterfaceLang   = 'Langue / Language :'
     ProfileLabel    = 'Type de clé :'
     ContentLang     = 'Langue du système :'
@@ -64,4 +64,9 @@
     ConfirmWord     = 'EFFACER'
     ConfirmWrong    = 'Confirmation incorrecte : la clé n''a pas été modifiée.'
     AdminNeeded     = 'Windows va demander l''autorisation administrateur (nécessaire pour Ventoy).'
+    SystemLabel     = 'Système :'
+    UsageLabel      = 'Usage :'
+    UsageBureautique   = 'Bureautique'
+    UsageDeveloppement = 'Développement'
+    LinuxHint       = 'Linux : les logiciels (bureautique, développement…) se choisissent sur le poste avec linux/lancer.sh.'
 }

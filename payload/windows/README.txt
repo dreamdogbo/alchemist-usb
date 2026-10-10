@@ -1,6 +1,6 @@
 ﻿==========================================================================
  INSTALLATION KEY — WINDOWS 11 WORKSTATION (works WITHOUT Internet)
- Ventoy Kit v{{KIT_VERSION}} by dreamdogbo — https://github.com/dreamdogbo/kit-ventoy
+ Alchemist v{{KIT_VERSION}} by dreamdogbo — https://github.com/dreamdogbo/alchemist-usb
 ==========================================================================
 
 KEY CONTENTS

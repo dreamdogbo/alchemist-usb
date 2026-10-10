@@ -1,0 +1,64 @@
+name: Tests Linux
+
+# Tests exécutés dans le cloud (aucun téléchargement lourd sur les postes des contributeurs)
+on:
+  push:
+  pull_request:
+
+jobs:
+  scripts:
+    name: Scripts et moteur sous Linux
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: shellcheck
+        run: shellcheck -S warning payload/linux/linux/*.sh creer-cle.sh tests/linux/*.sh
+
+      - name: Liste des composants
+        run: bash payload/linux/linux/installer-poste.sh --liste
+
+      - name: Moteur PowerShell 7 sous Linux (profils, éléments)
+        shell: pwsh
+        run: |
+          ./Build-Kit.ps1 -ListerProfils
+          foreach ($u in 'Bureautique', 'Developpement') {
+            $j = ./Build-Kit.ps1 -Systeme Linux -Usage $u -ListerElements | ConvertFrom-Json
+            "{0} : {1} élément(s)" -f $j.Profil, $j.Items.Count
+            if ($j.Items.Count -lt 1) { throw "Profil Linux $u vide" }
+          }
+
+      - name: Dernières versions stables Linux (sites officiels)
+        # Dépend de sites extérieurs : signalé sans bloquer la CI
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          Import-Module ./modules/Report.psm1, ./modules/Drive.psm1, ./modules/Download.psm1 -Force -DisableNameChecking
+          Initialize-KitNetwork
+          foreach ($d in 'Ubuntu', 'Debian', 'Mint', 'Fedora') {
+            $r = Resolve-KitLinuxIso -Item @{ Distro = $d }
+            "{0,-30} {1}" -f $r.Label, $r.FileName
+          }
+
+  simulation:
+    name: Simulation ${{ matrix.image }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ['ubuntu:26.04', 'ubuntu:24.04', 'debian:trixie', 'fedora:latest', 'linuxmintd/mint22-amd64']
+    container: ${{ matrix.image }}
+    env:
+      GITHUB_TOKEN: ${{ github.token }}
+    steps:
+      - name: Prérequis d'un poste de bureau (curl, python3, sudo)
+        run: |
+          if command -v apt-get >/dev/null; then apt-get update -qq && apt-get install -y -qq curl python3 sudo ca-certificates git
+          else dnf install -y -q curl python3 sudo git; fi
+      - uses: actions/checkout@v5
+      - name: Stack développement (simulation, rien n'est installé)
+        run: |
+          useradd -m testeur
+          SUDO_USER=testeur bash payload/linux/linux/installer-poste.sh -u developpement -n -y
+      - name: Tous les composants (simulation)
+        run: SUDO_USER=testeur bash payload/linux/linux/installer-poste.sh -t -n -y

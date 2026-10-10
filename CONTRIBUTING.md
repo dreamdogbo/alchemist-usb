@@ -56,7 +56,10 @@ Exemple : `feat(profil): ajouter le profil développement`.
 4. Fichiers `.ps1/.psm1/.psd1` en **UTF-8 avec BOM** (sinon les accents sont abîmés sous 5.1).
 5. `Invoke-ScriptAnalyzer -Settings PSScriptAnalyzerSettings.psd1` sans erreur ni avertissement.
 6. Ne jamais formater / repartitionner la clé ; ne toucher qu'aux fichiers listés dans le MANIFEST.
-7. Tester au minimum `.\Build-Kit.ps1 -DryRun` ; pour l'interface, `-TestSansAffichage -Capture <png>`.
+7. Tester au minimum `./Build-Kit.ps1 -DryRun` ; pour l'interface, `-TestSansAffichage -Capture <png>`.
+8. Scripts Linux : `shellcheck -S warning` sans remarque ; la simulation multi-distributions tourne dans
+   GitHub Actions (`tests-linux.yml`) — inutile de télécharger des images Docker sur votre poste.
+9. Composant Linux : prévoir les deux familles (`paquets "noms apt" "noms dnf"`).
 
 ## Ajouter un logiciel
 

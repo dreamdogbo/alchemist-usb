@@ -240,6 +240,13 @@ function Invoke-PostAction {
             }
             return 'configuré ; signatures à télécharger dès qu''Internet sera disponible (freshclam.exe)'
         }
+        'WSLFeatures' {
+            # WSL 2 (requis par Docker Desktop) : fonctionnalités Windows, effectives après redémarrage
+            foreach ($feature in 'Microsoft-Windows-Subsystem-Linux', 'VirtualMachinePlatform') {
+                & dism.exe /Online /Enable-Feature /FeatureName:$feature /All /NoRestart | Out-Null
+            }
+            return 'fonctionnalités WSL 2 activées (redémarrage requis) ; distribution Ubuntu : « wsl --install -d Ubuntu » avec Internet'
+        }
         default { return '' }
     }
 }
@@ -296,7 +303,7 @@ try {
             Enable-ComputerRestore -Drive "$env:SystemDrive\"
             # Autorise un point même si un autre a été créé il y a moins de 24 h
             New-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\SystemRestore' -Name 'SystemRestorePointCreationFrequency' -PropertyType DWord -Value 0 -Force | Out-Null
-            Checkpoint-Computer -Description 'Kit Ventoy - avant post-installation' -RestorePointType 'MODIFY_SETTINGS'
+            Checkpoint-Computer -Description 'Alchemist - avant post-installation' -RestorePointType 'MODIFY_SETTINGS'
             Add-Bilan -Nom 'Point de restauration' -Statut 'OK'
         }
         catch { Add-Bilan -Nom 'Point de restauration' -Statut 'ÉCHEC' -Detail $_.Exception.Message }

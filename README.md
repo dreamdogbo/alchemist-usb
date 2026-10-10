@@ -1,277 +1,220 @@
-# Kit Ventoy — clés d'installation prêtes à l'emploi
+# ⚗️ Alchemist — transformez un PC nu en poste prêt à l'emploi
 
-[![Version](https://img.shields.io/github/v/release/dreamdogbo/kit-ventoy?label=version)](https://github.com/dreamdogbo/kit-ventoy/releases)
-[![Analyse PowerShell](https://github.com/dreamdogbo/kit-ventoy/actions/workflows/lint.yml/badge.svg)](https://github.com/dreamdogbo/kit-ventoy/actions/workflows/lint.yml)
+[![Version](https://img.shields.io/github/v/release/dreamdogbo/alchemist-usb?label=version)](https://github.com/dreamdogbo/alchemist-usb/releases)
+[![Analyse PowerShell](https://github.com/dreamdogbo/alchemist-usb/actions/workflows/lint.yml/badge.svg)](https://github.com/dreamdogbo/alchemist-usb/actions/workflows/lint.yml)
+[![Tests Linux](https://github.com/dreamdogbo/alchemist-usb/actions/workflows/tests-linux.yml/badge.svg)](https://github.com/dreamdogbo/alchemist-usb/actions/workflows/tests-linux.yml)
 [![Licence MIT](https://img.shields.io/badge/licence-MIT-blue.svg)](LICENSE)
 [![SemVer](https://img.shields.io/badge/versioning-SemVer-brightgreen.svg)](https://semver.org/lang/fr/)
 [![Conventional Commits](https://img.shields.io/badge/commits-Conventional-yellow.svg)](https://www.conventionalcommits.org/fr/)
 
-> Préparez en quelques clics une **clé USB Ventoy** qui installe un poste Windows 11 complet
-> **sans Internet** : système, suite bureautique, logiciels, pilotes et réglages.
-> Pensé pour les techniciens, les mainteneurs et les services informatiques.
+> Une clé USB **Ventoy**, un assistant, et n'importe quel PC devient un poste **Windows 11** ou **Linux**
+> (Ubuntu LTS, Linux Mint, Debian, Fedora) complet : système, bureautique, outils de développement,
+> pilotes et réglages. Pensé pour les techniciens, les mainteneurs et les développeurs.
 
-**by [dreamdogbo](https://github.com/dreamdogbo)** · Licence MIT · Windows PowerShell 5.1 et PowerShell 7 · 🇫🇷 Français · 🇬🇧 [English summary](#english-summary)
+**by [dreamdogbo](https://github.com/dreamdogbo)** · Windows et Linux · PowerShell 7 / Windows PowerShell 5.1 · 🇫🇷 Français · 🇬🇧 [English](#english-summary)
 
-![Assistant de création de clé](docs/assistant-cle-fr.png)
+![Assistant Alchemist](docs/assistant-cle-fr.png)
 
 ---
 
 ## Sommaire
 
-- [Ce que fait le kit](#ce-que-fait-le-kit)
-- [Le dépôt ne contient aucun logiciel](#le-dépôt-ne-contient-aucun-logiciel)
-- [Démarrage rapide (3 clics)](#démarrage-rapide-3-clics)
+- [En 30 secondes](#en-30-secondes)
+- [Le parcours : Système → Usage → Versions → Clé](#le-parcours--système--usage--versions--clé)
+- [Démarrage rapide — Windows](#démarrage-rapide--windows)
+- [Démarrage rapide — Linux](#démarrage-rapide--linux)
 - [Sur le poste à installer](#sur-le-poste-à-installer)
-- [Contenu de la clé](#contenu-de-la-clé)
-- [Ligne de commande (experts, automatisation)](#ligne-de-commande-experts-automatisation)
-- [Mettre la clé à jour](#mettre-la-clé-à-jour)
-- [Personnaliser : logiciels, langues, profils](#personnaliser--logiciels-langues-profils)
+- [La stack](#la-stack)
+- [Ligne de commande](#ligne-de-commande)
 - [Sécurité et intégrité](#sécurité-et-intégrité)
-- [Architecture du projet](#architecture-du-projet)
+- [Personnaliser](#personnaliser)
+- [Architecture](#architecture)
 - [Versions et méthode de travail](#versions-et-méthode-de-travail)
 - [Feuille de route](#feuille-de-route)
 - [Limites connues](#limites-connues)
 - [English summary](#english-summary)
 
----
-
-## Ce que fait le kit
+## En 30 secondes
 
 | | |
 | --- | --- |
-| 🪟 **Windows 11 officiel** | ISO Microsoft (via [Fido](https://github.com/pbatard/Fido)), langue au choix : FR, EN, ES, DE, PT |
-| 📄 **Bureautique** | Microsoft 365 Apps hors ligne (ODT) **ou** suites gratuites **LibreOffice** / **ONLYOFFICE** |
-| 📦 **Logiciels** | Chrome, Firefox, Acrobat Reader, PDF24, PDFCraft, 7-Zip, VLC, Notepad++, ShareX, Teams, Zoom, Chocolatey + Chocolatey GUI, VC++ et .NET |
-| 🛡️ **Antivirus** | **ClamAV** (open source, Cisco Talos) en analyse à la demande ; Microsoft Defender reste la protection temps réel |
-| 🔧 **Outils technicien** | Snappy Driver Installer Origin (pilotes), CrystalDiskInfo, HWiNFO |
-| 🐧 **Multiboot** | Ubuntu LTS, Linux Mint, Debian, Fedora (optionnels, dernière version stable) |
-| 🖱️ **Fenêtres** | Assistant de création de clé + assistant d'installation du poste, sans console |
-| 🌍 **Multilingue** | Interface FR / EN (fichiers de langue extensibles) ; contenu (ISO, Office, clavier) multilingue |
-| 🛡️ **Sûr** | Sources officielles uniquement, SHA256 vérifiés, signatures Authenticode (désactivable), clé **jamais formatée** |
-| ♻️ **Idempotent** | Relancer = mise à jour : seules les nouvelles versions sont téléchargées et remplacent les anciennes |
-| 💾 **Sauvegarde** | Option de sauvegarde des données présentes sur la clé avant préparation |
+| 🧭 **Choix guidé** | Système (Windows / Linux) → usage (bureautique / développement) → versions → clé |
+| 🪟 **Windows 11** | ISO officielle (FR, EN, ES, DE, PT), Microsoft 365 hors ligne **ou** LibreOffice / ONLYOFFICE, logiciels, **installation 100 % hors ligne** |
+| 🐧 **Linux** | Ubuntu LTS (recommandé), Linux Mint, Debian, Fedora — stack bureautique ou développeur via les dépôts officiels |
+| 👩‍💻 **Développeurs** | VS Code, Git + GitHub CLI, Docker Engine & Desktop, WSL 2, Python/uv, Node.js LTS, Java, .NET, Go, Rust, Bruno, DBeaver… |
+| 📄 **Microsoft 365 sous Linux** | applications web intégrées, ONLYOFFICE local, ou Office de bureau complet via WinBoat |
+| 🎨 **Création** | GIMP, Inkscape, Krita, Kdenlive, OBS… et la suite open source ArtCraft (PhotoCraft, VectorCraft, FilmCraft…) |
+| 🔌 **Clé de A à Z** | installe / met à jour **Ventoy** lui-même (option, garde-fous), puis tout le reste en une fois |
+| 🖥️ **Partout** | crée la clé depuis **Windows** (`Creer-Cle.bat`) ou **Linux** (`creer-cle.sh`) |
+| 🛡️ **Sûr** | sources officielles, SHA256 vérifiés, signatures contrôlées, clé jamais formatée sans confirmation tapée |
+| ♻️ **À jour** | relancer = mise à jour : seules les nouvelles versions sont téléchargées |
 
-## Le dépôt ne contient aucun logiciel
+**Le dépôt ne contient aucun logiciel** : seulement des scripts (quelques centaines de Ko). Tout est
+téléchargé au moment où vous préparez une clé, depuis les sources officielles, en dernière version stable.
 
-Le dépôt ne contient **que des scripts, la configuration et la documentation** (quelques centaines de Ko).
-Aucun installeur ni aucune ISO n'y est stocké : tout est téléchargé **au moment où vous préparez une clé**,
-depuis les sources officielles, dans la **dernière version stable du jour** :
+## Le parcours : Système → Usage → Versions → Clé
 
-- logiciels hébergés sur GitHub (PDFCraft, Chocolatey, Chocolatey GUI…) : API GitHub `releases/latest`,
-  qui exclut brouillons et pré-versions, avec contrôle du SHA256 publié par GitHub ;
-- logiciels winget : manifeste stable du dépôt winget, SHA256 contrôlé ;
-- Windows 11 (Microsoft via Fido), Office (CDN Office, canal Current), Linux (dernière version stable de
-  chaque distribution, liste d'empreintes officielle).
+1. **Système** : Windows ou Linux.
+2. **Usage** : bureautique ou développement (détermine la stack proposée).
+3. **Versions** : cases à cocher — Windows 11 dans la langue choisie ; pour Linux, Ubuntu LTS (dernière et
+   précédente), Linux Mint, Debian, Fedora, et même Windows 11 pour un double démarrage.
+4. **Clé** : une clé Ventoy détectée automatiquement, **ou une clé neuve** sur laquelle Alchemist installe
+   Ventoy (après confirmation tapée).
 
-Un simple `git pull` récupère les évolutions du kit ; relancer l'assistant met la clé à jour.
+## Démarrage rapide — Windows
 
-## Démarrage rapide (3 clics)
+Prérequis : Windows 10/11 avec Internet, [winget](https://learn.microsoft.com/windows/package-manager/winget/)
+(présent par défaut sur Windows 11), une clé USB de 32 Go ou plus.
 
-**Prérequis** : un PC Windows 10/11 avec Internet, [winget](https://learn.microsoft.com/windows/package-manager/winget/)
-(« App Installer », présent par défaut sur Windows 11) et une clé USB de **32 Go** ou plus.
+```powershell
+git clone https://github.com/dreamdogbo/alchemist-usb.git
+```
 
-1. **Ventoy** : soit vous l'installez vous-même avec l'outil officiel ([ventoy.net](https://www.ventoy.net/fr/download.html)),
-   soit vous cochez **« Clé neuve : installer Ventoy »** dans l'assistant : le kit télécharge la release officielle
-   (SHA256 vérifié), l'installe sur la clé choisie **après confirmation tapée**, puis prépare tout le reste.
-2. **Récupérer le kit** :
+ou téléchargez l'archive de la [dernière version](https://github.com/dreamdogbo/alchemist-usb/releases), puis
+**double-cliquez `Creer-Cle.bat`**. Cochez « Clé neuve : installer Ventoy » si la clé n'a pas encore Ventoy.
 
-   ```powershell
-   git clone https://github.com/dreamdogbo/kit-ventoy.git
-   ```
+## Démarrage rapide — Linux
 
-   ou *Code → Download ZIP*, puis décompresser. Astuce : copiez le dossier `kit-ventoy` **sur la clé
-   elle-même** — les téléchargements sont alors simplement *déplacés* (rapide, pas d'espace en double)
-   et la clé pourra se compléter seule depuis n'importe quel poste.
-3. **Double-cliquer `Creer-Cle.bat`** : choisir le type de clé, la langue, cocher les logiciels,
-   puis **« Créer / mettre à jour la clé »**. Le journal défile en direct ; à la fin, la clé est prête.
+Prérequis : PowerShell 7 (proposé automatiquement : `sudo snap install powershell --classic`), `zenity`.
 
-> Pas de licence Office ? Décochez **Office365** et cochez **LibreOffice** ou **ONLYOFFICE**.
+```bash
+git clone https://github.com/dreamdogbo/alchemist-usb.git && cd alchemist-usb
+bash creer-cle.sh
+```
+
+Depuis Linux, on prépare les clés **Linux** (avec Windows 11 en option). Les clés Windows complètes
+(Microsoft 365 hors ligne, logiciels winget) se préparent depuis Windows.
 
 ## Sur le poste à installer
 
-1. Démarrer sur la clé (F12/F11/F9/Échap selon la marque) → menu Ventoy.
-2. Choisir l'ISO Windows 11 puis le modèle **`Windows11_HorsLigne.xml`** : compte **local** sans
-   Internet, langue et clavier prêts. *Aucun partitionnement automatique : le disque est choisi à la main.*
-3. Sur le bureau : **`postinstall\Lancer.bat`** → fenêtre d'installation :
+**Windows** — démarrer sur la clé, choisir l'ISO Windows 11 puis le modèle `Windows11_HorsLigne.xml`
+(compte local sans Internet), puis sur le bureau : **`postinstall\Lancer.bat`**.
 
-   ![Assistant du poste](docs/assistant-poste-fr.png)
+![Assistant du poste](docs/assistant-poste-fr.png)
 
-   - état de chaque logiciel (déjà installé / à installer / absent), cases à cocher ;
-   - nom du poste, réglages recommandés (point de restauration, extensions visibles, pas de veille
-     sur secteur, fuseau horaire, PDF → Acrobat Reader, Windows Update si Internet) ;
-   - **Pilotes (SDIO)**, outils portables, **Compléter la clé (Internet)** pour télécharger sur la clé
-     ce qui y manque.
-4. Mode sans fenêtre : `Lancer.bat -Auto` (options `-SansOffice`, `-NomPoste PC-012`).
+**Linux** — démarrer sur la clé, choisir la distribution, installer, puis dans le dossier `linux` de la clé :
+`bash lancer.sh` (fenêtre de choix des logiciels, Internet requis).
 
-## Contenu de la clé
+## La stack
 
-```text
-/ISO/Windows11_FR_x64.iso            Windows 11 (nom selon la langue)
-/ISO/Linux/<Distribution>/*.iso      Systèmes Linux optionnels
-/Bureautique/Office365/              setup.exe + config.xml + Office\ (hors ligne)
-/Bureautique/LibreOffice|ONLYOFFICE  Suites gratuites (optionnelles)
-/Logiciels/<Nom>/                    installeur + manifeste winget + silent.txt + <Nom>.source.json
-/postinstall/                        Lancer.bat, Pilotes.bat, Assistant-Poste.ps1, Install-Poste.ps1, catalogue.json
-/ventoy/                             ventoy.json + modèle d'installation hors ligne
-/LISEZMOI.txt, /README.txt           Guide d'une page (FR / EN) pour le technicien
-/MANIFEST.sha256                     Empreintes de tous les fichiers du kit (sha256sum -c)
-/kit-ventoy/                         (optionnel) le kit lui-même, pour compléter/mettre à jour la clé
-```
+Résumé ci-dessous ; le détail complet est dans **[docs/STACK.md](docs/STACK.md)**.
 
-## Ligne de commande (experts, automatisation)
+| | Bureautique | Développement (en plus) |
+| --- | --- | --- |
+| **Windows** | Microsoft 365 / LibreOffice / ONLYOFFICE, Chrome, Firefox, Acrobat Reader, PDF24, PDFCraft, 7-Zip, VLC, Notepad++, ShareX, Teams, Zoom, Chocolatey + GUI, ClamAV | VS Code, PowerShell 7, PowerToys, Git, GitHub CLI, WSL 2, Docker Desktop, Python, Node.js LTS, Java, .NET SDK, Bruno, DBeaver, KeePassXC |
+| **Linux** | Microsoft 365 (applications web), ONLYOFFICE, LibreOffice, Chrome, Edge, PDFCraft, Okular, Zoom, polices Office, ClamAV, pare-feu, Timeshift | VS Code, Git + gh + lazygit, Docker Engine + Desktop, KVM, Python + uv, Node.js LTS, Java, .NET, Go, Rust, Bruno, DBeaver, outils terminal |
+| **Options** | Création (GIMP, Inkscape, Krita, Kdenlive, OBS…), suite ArtCraft, WinBoat (Office de bureau sous Linux), DevOps, JetBrains Toolbox | |
+
+## Ligne de commande
 
 ```powershell
-.\Build-Kit.ps1 -DryRun                                   # simulation : sources + budget d'espace
-.\Build-Kit.ps1                                           # clé Ventoy détectée automatiquement
-.\Build-Kit.ps1 -Langue en -SansOffice -Avec LibreOffice  # clé anglaise, suite gratuite
-.\Build-Kit.ps1 -Avec Ubuntu,LinuxMint                    # + systèmes Linux (multiboot)
-.\Build-Kit.ps1 -Only Chrome,Firefox                      # mettre à jour seulement ces éléments
-.\Build-Kit.ps1 -SauvegardeVers D:\Sauvegardes            # sauvegarder d'abord les fichiers de la clé
-.\Build-Kit.ps1 -SansVerifSignature                       # ne pas exiger les signatures Authenticode
-.\Build-Kit.ps1 -ListerProfils                            # types de clé disponibles
-.\Build-Kit.ps1 -InstallerVentoy -Disque 2 -ConfirmerEffacement EFFACER-2   # clé neuve : Ventoy + contenu
-.\Build-Kit.ps1 -MettreAJourVentoy                        # mettre Ventoy à jour, données conservées
+# Windows ou Linux (PowerShell 7)
+./Build-Kit.ps1 -Systeme Windows -Usage Developpement -DryRun     # simulation
+./Build-Kit.ps1 -Systeme Linux -Usage Developpement -Avec LinuxMint
+./Build-Kit.ps1 -Systeme Windows -Usage Bureautique -SansOffice -Avec LibreOffice -Langue en
+./Build-Kit.ps1 -InstallerVentoy -Disque 2 -ConfirmerEffacement EFFACER-2                  # Windows : clé neuve
+sudo pwsh ./Build-Kit.ps1 -Systeme Linux -InstallerVentoy -Disque /dev/sdb -ConfirmerEffacement EFFACER-sdb
+./Build-Kit.ps1 -MettreAJourVentoy                                # Ventoy à jour, données conservées
+./Build-Kit.ps1 -ListerProfils
 ```
 
 | Paramètre | Rôle |
 | --- | --- |
-| `-Profil <nom>` | type de clé (`config\profils\<nom>.psd1`), défaut `windows11-bureautique` |
+| `-Systeme Windows\|Linux` `-Usage Bureautique\|Developpement` | choix du profil (ou `-Profil <nom>`) |
 | `-Langue fr\|en\|es\|de\|pt` | langue de l'ISO Windows, d'Office et du clavier |
-| `-DriveLetter E` | lettre de la clé (sinon détection automatique du volume « Ventoy ») |
-| `-Only a,b` / `-Avec a,b` | liste exacte / ajout d'éléments facultatifs |
-| `-SansOffice` | sans Microsoft 365 |
-| `-SkipDownload` | hors ligne : met en place ce qui est complet dans `cache\` |
-| `-DryRun` | simulation, rien n'est écrit |
+| `-Only a,b` / `-Avec a,b` / `-SansOffice` | sélection exacte / ajout d'options / sans Microsoft 365 |
+| `-DriveLetter E` (Windows) / `-KeyPath /media/moi/Ventoy` (Linux) | clé (sinon détection automatique) |
+| `-InstallerVentoy -Disque … -ConfirmerEffacement EFFACER-…` | clé neuve : installe Ventoy (efface le disque), options `-VentoyGPT`, `-VentoyFS`, `-VentoySansSecureBoot` |
+| `-MettreAJourVentoy` | met Ventoy à jour sans effacer |
+| `-DryRun`, `-SkipDownload` | simulation ; mise en place hors ligne depuis le cache |
 | `-SansVerifSignature` | Authenticode non exigé (les SHA256 publiés restent vérifiés) |
-| `-SauvegardeVers <dossier>` `[-SauvegardeComplete]` | sauvegarde préalable (fichiers personnels ou toute la clé) |
+| `-SauvegardeVers <dossier>` `[-SauvegardeComplete]` | sauvegarde préalable des données de la clé |
 | `-WindowsIsoUrl <url>` | lien officiel Microsoft si Fido est bloqué |
-| `-InstallerVentoy -Disque N -ConfirmerEffacement EFFACER-N` | installe Ventoy (EFFACE le disque N, USB uniquement, administrateur) puis prépare la clé ; options `-VentoyGPT`, `-VentoyFS NTFS`, `-VentoySansSecureBoot` |
-| `-MettreAJourVentoy` | met à jour Ventoy sur la clé, sans effacer les données |
-| `-CachePath`, `-LogFile` | zone de préparation, journal imposé |
+| `-ListerProfils [-Json]`, `-ListerElements` | informations pour scripts et assistants |
 
-Codes de sortie : `0` OK · `1` au moins un ÉCHEC · `2` clé invalide/erreur · `3` source officielle du système ou d'Office introuvable.
+Codes de sortie : `0` OK · `1` au moins un ÉCHEC · `2` erreur / clé invalide · `3` source officielle du système ou d'Office introuvable.
 
-Post-installation en ligne de commande : `Install-Poste.ps1 [-Logiciels a,b] [-AvecOutils] [-SansOffice] [-NomPoste X] [-SansReglages]`.
-
-## Mettre la clé à jour
-
-Relancez simplement l'assistant (ou `Build-Kit.ps1`). Pour chaque élément :
-winget → SHA256 publié · GitHub → `digest` de la release · éditeurs → nom/taille/date ·
-Windows → nom et taille de l'ISO officielle · Office → version du canal · Linux → liste d'empreintes officielle.
-Ce qui est à jour n'est ni retéléchargé ni recopié ; une nouvelle version **remplace** l'ancienne (pas de cumul).
-Un téléchargement interrompu **reprend** où il s'était arrêté.
-
-## Personnaliser : logiciels, langues, profils
-
-**Ajouter un logiciel** — un bloc dans `config\profils\windows11-bureautique.psd1` :
-
-```powershell
-@{
-    Name = 'GIMP'; Category = 'Graphisme'; Type = 'Winget'; Priority = 5; TargetDir = 'Logiciels/GIMP'
-    WingetId = 'GIMP.GIMP.3'; Architecture = 'x64'; EstimatedSizeMB = 350
-    Signer = ''                                   # regex de l'éditeur (Authenticode), '' = SHA256 winget suffit
-    SilentArgs = '/VERYSILENT /NORESTART /ALLUSERS'; SuccessCodes = @(0)
-    Detection = 'reg:^GIMP'; Order = 60           # reg: | appx: | c2r: | file: | ''
-}
-```
-
-Types de source : `Winget`, `GitHub` (`Repo`, `AssetPattern`, dernière release stable), `Url` (lien éditeur,
-signature obligatoire), `Office`, `WindowsIso`, `LinuxIso` (`Distro`). Options : `Mode = 'Manuel'` (outil à la
-demande), `Default = $false` (non coché), `Extract = $true` + `Launcher` (outil portable).
-
-**Ajouter une langue d'interface** — copier `lang\fr.psd1` (et `payload\windows\postinstall\lang\fr.psd1`)
-en `xx.psd1`, traduire les valeurs. Elle apparaît automatiquement dans les fenêtres.
-
-**Ajouter une langue de contenu** — rubrique `Langues` du profil (`FidoLang`, `Office`, `UILang`, `InputLocale`).
-
-**Créer un type de clé** — nouveau fichier dans `config\profils\` (copie du profil existant) : il apparaît
-dans la liste « Type de clé » de l'assistant.
+Post-installation Linux : `installer-poste.sh -u bureautique|developpement [-c id1,id2] [-t] [-n] [-y] [--liste]`.
+Post-installation Windows : `Install-Poste.ps1 [-Logiciels a,b] [-AvecOutils] [-SansOffice] [-NomPoste X] [-SansReglages]`.
 
 ## Sécurité et intégrité
 
-- **Sources officielles uniquement** : Microsoft, éditeurs, dépôt winget, releases GitHub officielles, sites
-  des distributions Linux. **Aucune ISO modifiée, aucun outil d'activation** : Windows et Office s'activent
-  avec des licences légitimes (licence du PC, KMS/MAK de l'organisation, compte Microsoft 365).
-- **SHA256** : publié par winget / GitHub / la distribution, toujours vérifié ; enregistré dans `MANIFEST.sha256`
-  (`sha256sum -c MANIFEST.sha256` vérifie toute la clé).
-- **Authenticode** : signature de l'éditeur contrôlée (exigée pour les liens directs) ; désactivable avec
-  `-SansVerifSignature` (ou la case dans l'assistant) — les SHA256 restent contrôlés.
-- **Antivirus** : Microsoft Defender (intégré à Windows 11) assure la protection en temps réel ; le kit ajoute **ClamAV**
-  (open source) pour les analyses à la demande, configuré automatiquement (signatures mises à jour dès qu'Internet est
-  disponible). Deux antivirus temps réel simultanés sont volontairement évités (conflits, lenteurs).
-- **Préparer ou mettre à jour une clé ne la formate jamais** : seuls les fichiers listés dans le MANIFEST sont
-  remplacés ou supprimés ; un fichier personnel au même emplacement n'est jamais écrasé.
-- **Clé neuve (option)** : l'installation de Ventoy efface le disque choisi. Garde-fous : disques USB/SD uniquement,
-  jamais le disque système ni celui où se trouve le kit, confirmation tapée (`EFFACER-<n>`), droits administrateur,
-  sauvegarde proposée ; Ventoy officiel vérifié par SHA256.
+- **Sources officielles uniquement** : Microsoft, éditeurs, dépôt winget, releases GitHub stables, sites des
+  distributions, dépôts apt/dnf officiels, Flathub. **Aucune ISO modifiée, aucun outil d'activation** :
+  licences légitimes uniquement.
+- **SHA256** publiés (winget, GitHub, distributions, Go) toujours vérifiés ; `MANIFEST.sha256` permet de
+  vérifier toute la clé (`sha256sum -c MANIFEST.sha256`).
+- **Signatures Authenticode** contrôlées sous Windows (désactivables, tracé dans le journal).
+- **Préparer ou mettre à jour une clé ne la formate jamais** ; seuls les fichiers du kit sont modifiés.
+- **Clé neuve (option)** : USB/SD uniquement, jamais le disque système ni celui où se trouve Alchemist,
+  confirmation tapée, droits administrateur, sauvegarde proposée.
+- **Rien de lourd sur votre ordinateur** : la zone de téléchargement est **sur la clé** (`kit-cache`).
 
-## Architecture du projet
+## Personnaliser
+
+- **Logiciel Windows** : un bloc dans `config/profils/windows11-*.psd1` (types `Winget`, `GitHub`, `Url`).
+- **Composant Linux** : une ligne dans `COMPOSANTS` et une fonction `comp_<id>` dans
+  `payload/linux/linux/installer-poste.sh` (helpers `paquets "deb" "rpm"`, `flatpak_installer`, `github_paquet`).
+- **Nouveau profil** : un fichier dans `config/profils/` ; il peut **hériter** d'un autre (`Herite`, `Items`,
+  `Retirer`, `ParDefaut`, `NonParDefaut`).
+- **Langue d'interface** : copier `lang/fr.psd1` (et `payload/windows/postinstall/lang/fr.psd1`) en `xx.psd1`.
+
+## Architecture
 
 ```text
-kit-ventoy/
-├── Creer-Cle.bat / Assistant.ps1     fenêtre de création de clé
-├── Build-Kit.ps1                     moteur (ligne de commande)
-├── config/profils/*.psd1             types de clé (catalogues)
-├── config/office-config.xml          configuration Office Deployment Tool
-├── lang/*.psd1                       textes de l'assistant (FR, EN, …)
-├── modules/                          Drive, Budget, Download, Sync, Backup, Report
-├── payload/windows/                  copié sur la clé : postinstall (fenêtre + moteur + thème), ventoy, LISEZMOI
-├── docs/                             captures d'écran
-└── .github/workflows/lint.yml        PSScriptAnalyzer à chaque push
+alchemist-usb/
+├── Creer-Cle.bat / Assistant.ps1     assistant Windows (fenêtre)
+├── creer-cle.sh                      assistant Linux (zenity)
+├── Build-Kit.ps1                     moteur (Windows et Linux, PowerShell 7 / 5.1)
+├── config/profils/*.psd1             profils Système × Usage (héritage)
+├── modules/                          Drive, Ventoy, Profile, Budget, Download, Sync, Backup, Report
+├── payload/windows/                  copié sur les clés Windows (post-installation, LISEZMOI, Ventoy)
+├── payload/linux/                    copié sur les clés Linux (linux/lancer.sh, installer-poste.sh)
+├── lang/                             textes des assistants (FR, EN…)
+├── tests/linux/                      tests des scripts Linux (exécutés dans GitHub Actions)
+└── docs/                             STACK.md, captures
 ```
 
 ## Versions et méthode de travail
 
-- **Versions** : [gestion sémantique](https://semver.org/lang/fr/) `MAJEUR.MINEUR.CORRECTIF` ; source unique [`VERSION`](VERSION),
-  affichée dans les fenêtres, les journaux et sur la clé. Historique : [CHANGELOG](CHANGELOG.md) (Keep a Changelog).
-- **Téléchargement d'une version** : page [Releases](https://github.com/dreamdogbo/kit-ventoy/releases) (archive prête à l'emploi),
-  ou `git clone` puis `git checkout vX.Y.Z`.
-- **Développement** : GitHub Flow (`main` stable, branches `feat/…` / `fix/…`, Pull Requests), commits
-  [Conventional Commits](https://www.conventionalcommits.org/fr/), intégration continue (PSScriptAnalyzer), publication
-  automatique à chaque étiquette `vX.Y.Z`. Détails : [CONTRIBUTING](CONTRIBUTING.md) · Sécurité : [SECURITY](SECURITY.md).
+- **Versions** : [SemVer](https://semver.org/lang/fr/), source unique [`VERSION`](VERSION) ;
+  historique dans le [CHANGELOG](CHANGELOG.md) (Keep a Changelog).
+- **Développement** : GitHub Flow (`main` stable, branches `feat/…`, Pull Requests), commits
+  [Conventional Commits](https://www.conventionalcommits.org/fr/), CI (PSScriptAnalyzer, shellcheck, simulation
+  sur Ubuntu / Debian / Fedora / Mint), publication automatique à chaque étiquette `vX.Y.Z`.
+- Détails : [CONTRIBUTING](CONTRIBUTING.md) · Sécurité : [SECURITY](SECURITY.md) · Évolutions : [ROADMAP](ROADMAP.md).
 
 ## Feuille de route
 
-- [x] **v1.0** : Windows 11 + Office/LibreOffice/ONLYOFFICE + logiciels + pilotes + ClamAV, hors ligne, fenêtres FR/EN, multiboot Linux.
-- [x] **v1.1** : installer / mettre à jour **Ventoy** depuis l'assistant, puis tout le reste en une seule opération.
-- [ ] **v1.2** : profils par usage (bureautique, développement, statistiques, graphisme/vidéo).
-- [ ] **v2.0** : outil **universel** (créer la clé depuis Windows, Linux ou macOS : moteur PowerShell 7, interface multiplateforme).
-- [ ] **v2.x** : Linux de première classe (installation automatisée, profil développeur : Docker, VS Code, langages ;
-      Microsoft 365 sous Linux ; équivalents Adobe : Inkscape, GIMP/Krita, Kdenlive/DaVinci Resolve, PDFCraft).
-- [ ] **v2.1** : assistant de migration Windows → Linux.
+- [x] Windows 11 hors ligne, Microsoft 365 ou suites gratuites, assistants FR/EN (v1.0)
+- [x] Installation / mise à jour de Ventoy (v1.1)
+- [x] Système × usage, Linux multi-distributions, stack développeur, création de clé depuis Linux (v1.2)
+- [ ] Installation Linux automatisée (autoinstall / kickstart), paquets Linux hors ligne sur la clé
+- [ ] Profils statistiques / données et graphisme
+- [ ] Assistant de migration Windows → Linux (données, SSH, Git, extensions VS Code)
 
 Détails : [ROADMAP.md](ROADMAP.md).
 
 ## Limites connues
 
-- **Fido** : Microsoft bloque parfois les téléchargements automatisés → champ « Lien officiel de l'ISO »
-  (ou `-WindowsIsoUrl`), ou ISO déposée dans `cache\Windows11\` + `-SkipDownload`. Si l'ISO est déjà sur la
-  clé, elle est conservée.
-- **Compte local hors ligne** : Microsoft durcit régulièrement l'OOBE ; repli `Maj+F10` → `start ms-cxh:localonly`.
-- **Sites temporairement injoignables** (ex. SDIO) : l'élément est signalé ÉCHEC sans bloquer le reste ;
-  relancer plus tard le récupère.
-- Les messages du journal technique sont en français (l'interface est multilingue).
+- **Fido** : Microsoft bloque parfois les téléchargements automatisés → lien officiel (`-WindowsIsoUrl`) ou ISO
+  déposée dans le cache ; une ISO déjà sur la clé est conservée.
+- **Post-installation Linux** : en ligne (dépôts officiels) ; l'installation hors ligne viendra plus tard.
+- **Compte local Windows hors ligne** : Microsoft durcit l'OOBE ; repli `Maj+F10` → `start ms-cxh:localonly`.
+- La suite **ArtCraft** est encore jeune (versions 0.x) : proposée en option.
 
 ---
 
 ## English summary
 
-**Ventoy Kit** builds a ready-to-use **Ventoy USB key** that installs a complete Windows 11 workstation
-**offline**: official Windows 11 ISO (FR/EN/ES/DE/PT), Microsoft 365 Apps offline **or** free suites
-(LibreOffice / ONLYOFFICE), common software, Chocolatey + GUI, driver tool (SDIO), technician tools, and optional
-Linux systems (Ubuntu LTS, Mint, Debian, Fedora) for multiboot.
-
-- **Build the key**: install Ventoy on the key once, clone this repo, double-click **`Creer-Cle.bat`**, pick the
-  key type, language and software, click **Build**. Everything comes from official sources, with SHA256 checks
-  and (optional) Authenticode checks. The key is **never formatted**; running again **updates** it.
-- **On the target PC**: boot the key, pick the Windows ISO and the `Windows11_HorsLigne.xml` template (local
-  account, no Internet), then run **`postinstall\Lancer.bat`**: a window lets you choose what to install,
-  name the computer, apply recommended settings, launch the driver tool or complete the key from the Internet.
-- **CLI**: `Build-Kit.ps1 -Langue en -SansOffice -Avec LibreOffice`, `-DryRun`, `-Only`, `-SauvegardeVers`…
-- **Interface languages**: French and English; add one by translating `lang\fr.psd1`.
-
-No activation tools are included: use legitimate licences only.
+**Alchemist** turns a bare PC into a ready-to-use **Windows 11** or **Linux** (Ubuntu LTS, Mint, Debian, Fedora)
+workstation from a single **Ventoy** USB key. Pick the **system**, the **usage** (office / development) and the
+**versions**; Alchemist downloads everything from official sources (latest stable, SHA256-verified), can install
+Ventoy itself, and works from **Windows** (`Creer-Cle.bat`) or **Linux** (`creer-cle.sh`). Windows keys install fully
+**offline**; Linux keys install the stack from official repositories (VS Code, Docker Engine & Desktop, Git/gh,
+Python/uv, Node.js, Java, .NET, Go, Rust, Microsoft 365 web apps, ONLYOFFICE, WinBoat…). See [docs/STACK.md](docs/STACK.md).
+No activation tools: legitimate licences only.
 
 ---
 
-Conçu et maintenu par **[dreamdogbo](https://github.com/dreamdogbo)**. Contributions bienvenues : voir [CONTRIBUTING.md](CONTRIBUTING.md).
+Conçu et maintenu par **[dreamdogbo](https://github.com/dreamdogbo)** · Contributions bienvenues : [CONTRIBUTING.md](CONTRIBUTING.md).

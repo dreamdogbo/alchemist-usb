@@ -1,6 +1,6 @@
 @echo off
 REM ============================================================
-REM  Kit Ventoy - Assistant de preparation de cle (fenetre)
+REM  Alchemist - Assistant de preparation de cle (fenetre)
 REM  Double-cliquer ce fichier.
 REM ============================================================
 cd /d "%~dp0"

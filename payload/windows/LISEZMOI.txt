@@ -1,6 +1,6 @@
 ﻿==========================================================================
  CLÉ D'INSTALLATION — POSTE WINDOWS 11 (fonctionne SANS Internet)
- Kit Ventoy v{{KIT_VERSION}} by dreamdogbo — https://github.com/dreamdogbo/kit-ventoy
+ Alchemist v{{KIT_VERSION}} by dreamdogbo — https://github.com/dreamdogbo/alchemist-usb
 ==========================================================================
 
 CONTENU DE LA CLÉ

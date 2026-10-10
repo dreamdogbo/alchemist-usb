@@ -42,7 +42,9 @@
 #
 @{
     # ---------------------------------------------------------------- description du profil
-    Nom          = 'Windows 11 — poste bureautique'
+    Nom          = 'Windows 11 — Bureautique'
+    Usage        = 'Bureautique'
+    Ordre        = 1
     Description  = 'Windows 11 x64 (FR, EN, ES, DE, PT) + Microsoft 365 ou suite gratuite + logiciels + outils technicien, 100 % hors ligne'
     Systeme      = 'Windows'
     KitVersion   = '2.0'
@@ -60,7 +62,7 @@
     OfficeConfig = 'office-config.xml'
 
     # Contenu copié à la racine de la clé (relatif au dossier du kit)
-    Payload      = 'payload\windows'
+    Payload      = 'payload/windows'
 
     # Fuseau horaire appliqué à l'installation et par la post-installation (Id Windows)
     TimeZone     = 'Greenwich Standard Time'
@@ -291,6 +293,49 @@
             Detection = 'reg:^ClamAV'; Order = 62
             PostAction = 'ClamAVConfig'   # crée freshclam.conf / clamd.conf, met à jour les signatures si Internet
         }
+
+        # ================================================================== Création (optionnel)
+        # Références éprouvées (open source) : décochées par défaut, à cocher selon les besoins.
+        @{ Name = 'GIMP'; Category = 'Création'; Type = 'Winget'; Priority = 6; Default = $false; TargetDir = 'Logiciels/GIMP'
+           WingetId = 'GIMP.GIMP.3'; Architecture = 'x64'; Scope = 'machine'; EstimatedSizeMB = 330; Signer = ''
+           SilentArgs = '/VERYSILENT /NORESTART /SUPPRESSMSGBOXES /SP- /ALLUSERS'; SuccessCodes = @(0); Detection = 'reg:^GIMP'; Order = 70 }
+        @{ Name = 'Inkscape'; Category = 'Création'; Type = 'Winget'; Priority = 6; Default = $false; TargetDir = 'Logiciels/Inkscape'
+           WingetId = 'Inkscape.Inkscape'; Architecture = 'x64'; InstallerType = 'wix'; EstimatedSizeMB = 130; Signer = ''
+           SilentArgs = '/qn /norestart'; SuccessCodes = @(0, 3010, 1641); Detection = 'reg:^Inkscape'; Order = 71 }
+        @{ Name = 'Krita'; Category = 'Création'; Type = 'Winget'; Priority = 6; Default = $false; TargetDir = 'Logiciels/Krita'
+           WingetId = 'KDE.Krita'; Architecture = 'x64'; EstimatedSizeMB = 160; Signer = ''
+           SilentArgs = '/S'; SuccessCodes = @(0); Detection = 'reg:^Krita'; Order = 72 }
+        @{ Name = 'Kdenlive'; Category = 'Création'; Type = 'Winget'; Priority = 6; Default = $false; TargetDir = 'Logiciels/Kdenlive'
+           WingetId = 'KDE.Kdenlive'; Architecture = 'x64'; EstimatedSizeMB = 160; Signer = ''
+           SilentArgs = '/S'; SuccessCodes = @(0); Detection = 'reg:^Kdenlive'; Order = 73 }
+        @{ Name = 'OBSStudio'; Category = 'Création'; Type = 'Winget'; Priority = 6; Default = $false; TargetDir = 'Logiciels/OBSStudio'
+           WingetId = 'OBSProject.OBSStudio'; Architecture = 'x64'; EstimatedSizeMB = 150; Signer = ''
+           SilentArgs = '/S'; SuccessCodes = @(0); Detection = 'reg:^OBS Studio'; Order = 74 }
+        @{ Name = 'Audacity'; Category = 'Création'; Type = 'Winget'; Priority = 6; Default = $false; TargetDir = 'Logiciels/Audacity'
+           WingetId = 'Audacity.Audacity'; Architecture = 'x64'; InstallerType = 'wix'; EstimatedSizeMB = 60; Signer = ''
+           SilentArgs = '/qn /norestart'; SuccessCodes = @(0, 3010, 1641); Detection = 'reg:^Audacity'; Order = 75 }
+
+        # ================================================================== Suite ArtCraft (même éditeur que PDFCraft)
+        # Alternatives open source (Rust) à Photoshop, Illustrator, Premiere, Lightroom, After Effects,
+        # InDesign. Encore jeunes (versions 0.x) : décochées par défaut. Dernière release STABLE GitHub.
+        @{ Name = 'PhotoCraft'; Category = 'Création (ArtCraft)'; Type = 'GitHub'; Priority = 6; Default = $false; TargetDir = 'Logiciels/PhotoCraft'
+           Repo = 'storytold/photocraft'; AssetPattern = '^photocraft-[\d.]+-windows-x64\.msi$'; EstimatedSizeMB = 80; Signer = ''
+           SilentArgs = '/qn /norestart'; SuccessCodes = @(0, 3010, 1641); Detection = 'reg:(?i)^photocraft'; Order = 80 }
+        @{ Name = 'VectorCraft'; Category = 'Création (ArtCraft)'; Type = 'GitHub'; Priority = 6; Default = $false; TargetDir = 'Logiciels/VectorCraft'
+           Repo = 'storytold/vectorcraft'; AssetPattern = '^vectorcraft-[\d.]+-windows-x64\.msi$'; EstimatedSizeMB = 80; Signer = ''
+           SilentArgs = '/qn /norestart'; SuccessCodes = @(0, 3010, 1641); Detection = 'reg:(?i)^vectorcraft'; Order = 81 }
+        @{ Name = 'FilmCraft'; Category = 'Création (ArtCraft)'; Type = 'GitHub'; Priority = 6; Default = $false; TargetDir = 'Logiciels/FilmCraft'
+           Repo = 'storytold/filmcraft'; AssetPattern = '^filmcraft-[\d.]+-windows-x64\.msi$'; EstimatedSizeMB = 90; Signer = ''
+           SilentArgs = '/qn /norestart'; SuccessCodes = @(0, 3010, 1641); Detection = 'reg:(?i)^filmcraft'; Order = 82 }
+        @{ Name = 'LightCraft'; Category = 'Création (ArtCraft)'; Type = 'GitHub'; Priority = 6; Default = $false; TargetDir = 'Logiciels/LightCraft'
+           Repo = 'storytold/lightcraft'; AssetPattern = '^lightcraft-[\d.]+-windows-x64\.msi$'; EstimatedSizeMB = 80; Signer = ''
+           SilentArgs = '/qn /norestart'; SuccessCodes = @(0, 3010, 1641); Detection = 'reg:(?i)^lightcraft'; Order = 83 }
+        @{ Name = 'EffectCraft'; Category = 'Création (ArtCraft)'; Type = 'GitHub'; Priority = 6; Default = $false; TargetDir = 'Logiciels/EffectCraft'
+           Repo = 'storytold/effectcraft'; AssetPattern = '^effectcraft-[\d.]+-windows-x64\.msi$'; EstimatedSizeMB = 80; Signer = ''
+           SilentArgs = '/qn /norestart'; SuccessCodes = @(0, 3010, 1641); Detection = 'reg:(?i)^effectcraft'; Order = 84 }
+        @{ Name = 'DesignCraft'; Category = 'Création (ArtCraft)'; Type = 'GitHub'; Priority = 6; Default = $false; TargetDir = 'Logiciels/DesignCraft'
+           Repo = 'storytold/designcraft'; AssetPattern = '^designcraft-[\d.]+-windows-x64\.msi$'; EstimatedSizeMB = 80; Signer = ''
+           SilentArgs = '/qn /norestart'; SuccessCodes = @(0, 3010, 1641); Detection = 'reg:(?i)^designcraft'; Order = 85 }
 
         # ================================================================== Outils technicien (Mode Manuel)
         @{

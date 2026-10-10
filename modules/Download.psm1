@@ -9,11 +9,11 @@
 #
 Set-StrictMode -Version Latest
 
-$script:UserAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) kit-ventoy/2.0'
+$script:UserAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) alchemist/1.2'
 $script:MaxAttempts = 3
 $script:SkipSignature = $false
 # Agent « honnête » pour les sites qui bloquent les robots se présentant comme un navigateur (Fedora…)
-$script:PlainAgent = 'kit-ventoy/2.0 (+https://github.com/dreamdogbo/kit-ventoy)'
+$script:PlainAgent = 'alchemist/1.2 (+https://github.com/dreamdogbo/alchemist-usb)'
 
 function Set-KitSignaturePolicy {
     <#
@@ -64,9 +64,32 @@ function Get-KitGitHubRelease {
         }
         catch {
             $last = $_.Exception.Message
+            # Limite de l'API GitHub atteinte (403/429) : repli immédiat sur les pages publiques
+            if ($last -match '403|429|rate limit') { break }
             if ($attempt -lt $script:MaxAttempts) { Start-Sleep -Seconds (3 * $attempt) }
         }
     }
+    # Repli sans API : étiquette via /releases/latest, fichiers via la page des assets (pas de SHA256
+    # publié dans ce cas : la signature de l'éditeur devient obligatoire en aval)
+    try {
+        $ri = Get-KitRemoteInfo -Url "https://github.com/$Repo/releases/latest" -Agent $script:PlainAgent
+        if ($ri.FinalUrl -match '/releases/tag/([^/?#]+)') {
+            $tag = [uri]::UnescapeDataString($Matches[1])
+            $html = Get-KitText -Url "https://github.com/$Repo/releases/expanded_assets/$tag"
+            foreach ($m in [regex]::Matches($html, 'href="(/[^"]+/releases/download/[^"]+)"')) {
+                $path = $m.Groups[1].Value
+                $name = [uri]::UnescapeDataString(($path -split '/')[-1])
+                if ($name -match $AssetPattern) {
+                    $url = 'https://github.com' + $path
+                    $len = -1.0
+                    try { $len = (Get-KitRemoteInfo -Url $url -Agent $script:PlainAgent).Length } catch { Write-Verbose 'Taille inconnue.' }
+                    Write-KitLog -Level WARN -Message "GitHub $Repo : API indisponible ($last), repli sur la page publique des releases."
+                    return [pscustomobject]@{ Version = $tag.TrimStart('v'); Url = $url; FileName = $name; Length = $len; Sha256 = '' }
+                }
+            }
+        }
+    }
+    catch { $last = "$last ; repli : $($_.Exception.Message)" }
     throw "GitHub $Repo : $last"
 }
 
@@ -147,10 +170,17 @@ function Resolve-KitLinuxIso {
     param([Parameter(Mandatory)] [hashtable] $Item)
     switch ($Item.Distro) {
         'Ubuntu' {
-            $meta = Get-KitText -Url 'https://changelogs.ubuntu.com/meta-release-lts'
-            $block = @($meta -split "`r?`n`r?`n" | Where-Object { $_ -match 'Supported: 1' }) | Select-Object -Last 1
-            if (-not $block -or $block -notmatch 'Version:\s*(\d+\.\d+)') { throw 'Version LTS Ubuntu introuvable.' }
-            $series = $Matches[1]
+            if ($Item.ContainsKey('Series') -and $Item.Series) {
+                # Version LTS imposée par le profil (ex. 24.04)
+                $series = [string]$Item.Series
+            }
+            else {
+                # Dernière LTS supportée, d'après le fichier officiel d'Ubuntu
+                $meta = Get-KitText -Url 'https://changelogs.ubuntu.com/meta-release-lts'
+                $block = @($meta -split "`r?`n`r?`n" | Where-Object { $_ -match 'Supported: 1' }) | Select-Object -Last 1
+                if (-not $block -or $block -notmatch 'Version:\s*(\d+\.\d+)') { throw 'Version LTS Ubuntu introuvable.' }
+                $series = $Matches[1]
+            }
             $base = "https://releases.ubuntu.com/$series/"
             $sums = Get-KitText -Url ($base + 'SHA256SUMS')
             $hit = Find-KitChecksum -Text $sums -Pattern '^ubuntu-[\d.]+-desktop-amd64\.iso$'
@@ -694,7 +724,8 @@ function Get-KitWindowsIsoUrl {
     )
     $last = ''
     for ($attempt = 1; $attempt -le $script:MaxAttempts; $attempt++) {
-        $out = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $FidoPath `
+        $psHost = $(if (Test-KitWindows) { 'powershell.exe' } else { (Get-Process -Id $PID).Path })
+        $out = & $psHost -NoProfile -ExecutionPolicy Bypass -File $FidoPath `
             -Win $Item.FidoWin -Rel $Item.FidoRel -Ed $Item.FidoEd -Lang $Item.FidoLang -Arch $Item.FidoArch -GetUrl 2>&1 |
             ForEach-Object { [string]$_ }
         $url = @($out | Where-Object { $_ -match '^https://\S+\.iso' }) | Select-Object -Last 1

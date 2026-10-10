@@ -7,10 +7,35 @@ la [gestion sémantique de version](https://semver.org/lang/fr/) (`MAJEUR.MINEUR
 
 ## [Non publié]
 
-### Prévu
+## [1.2.0] - 2026-10-10
 
-- Profils par système et par usage : Windows / Ubuntu, bureautique / développement.
-- Kit utilisable depuis Linux.
+Le projet devient **Alchemist** (dépôt `dreamdogbo/alchemist-usb`, ancien nom redirigé).
+
+### Ajouté
+
+- Parcours **Système → Usage → Versions → Clé** : profils Windows / Linux × Bureautique / Développement,
+  avec **héritage** de profils (module `Profile.psm1`), paramètres `-Systeme` / `-Usage`.
+- Profil **Windows 11 — Développement** : VS Code, PowerShell 7, PowerToys, Git, GitHub CLI, WSL 2 (MSI officiel),
+  Docker Desktop, Python, Node.js LTS, Java Temurin 25, .NET SDK 10, Go, Rust, Bruno, DBeaver, Postman, KeePassXC.
+- Profils **Linux** (Ubuntu LTS par défaut, Ubuntu 24.04, Linux Mint, Debian, Fedora, Windows 11 en option)
+  avec choix d'une version précise d'Ubuntu (`Series`).
+- **Post-installation Linux multi-distributions** (`linux/installer-poste.sh` + assistant `linux/lancer.sh`) :
+  familles apt et dnf, 35 composants, dépôts officiels, simulation, journal, bilan. Microsoft 365 en applications
+  web, ONLYOFFICE, WinBoat, Docker Engine + Desktop, KVM, langages, DevOps, création.
+- Catégorie **Création** (GIMP, Inkscape, Krita, Kdenlive, OBS, Audacity) et **suite ArtCraft** (PhotoCraft,
+  VectorCraft, FilmCraft, LightCraft, EffectCraft, DesignCraft) sous Windows et Linux.
+- **Alchemist sous Linux** : moteur PowerShell 7 multiplateforme (clé par point de montage `-KeyPath`,
+  Ventoy via `Ventoy2Disk.sh`), assistant `creer-cle.sh` (zenity).
+- Zone de téléchargement **sur la clé** par défaut (`kit-cache`) : rien de lourd sur l'ordinateur.
+- `-ListerProfils -Json` et `-ListerElements` pour les assistants et scripts.
+- Documentation de la stack : `docs/STACK.md`.
+- CI : tests Linux dans GitHub Actions (shellcheck, moteur sous Linux, simulation Ubuntu 26.04/24.04, Debian 13,
+  Fedora, Linux Mint).
+
+### Modifié
+
+- Assistant Windows : sélection Système / Usage, conseils adaptés au système, nouveau titre.
+- Post-installation Windows : activation des fonctionnalités WSL 2 pour Docker Desktop.
 
 ## [1.1.0] - 2026-10-10
 
@@ -59,6 +84,7 @@ Première version stable : clé Windows 11 complète, installable hors ligne.
 - Version unique (`VERSION`) affichée dans les fenêtres, les journaux et sur la clé.
 - Intégration continue : PSScriptAnalyzer, syntaxe PowerShell 5.1, lecture des profils et langues.
 
-[Non publié]: https://github.com/dreamdogbo/kit-ventoy/compare/v1.1.0...HEAD
-[1.1.0]: https://github.com/dreamdogbo/kit-ventoy/compare/v1.0.0...v1.1.0
-[1.0.0]: https://github.com/dreamdogbo/kit-ventoy/releases/tag/v1.0.0
+[Non publié]: https://github.com/dreamdogbo/alchemist-usb/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/dreamdogbo/alchemist-usb/compare/v1.1.0...v1.2.0
+[1.1.0]: https://github.com/dreamdogbo/alchemist-usb/compare/v1.0.0...v1.1.0
+[1.0.0]: https://github.com/dreamdogbo/alchemist-usb/releases/tag/v1.0.0

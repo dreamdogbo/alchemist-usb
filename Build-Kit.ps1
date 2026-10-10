@@ -20,8 +20,18 @@
 
 .PARAMETER Profil
     Nom du profil (fichier de config\profils\ sans extension). Défaut : windows11-bureautique.
+.PARAMETER Systeme
+    Windows ou Linux : avec -Usage, choisit le profil correspondant (au lieu de -Profil).
+.PARAMETER Usage
+    Bureautique ou Developpement.
 .PARAMETER ListerProfils
-    Affiche les profils disponibles et quitte.
+    Affiche les profils disponibles et quitte (-Json pour une sortie JSON).
+.PARAMETER ListerElements
+    Affiche en JSON les éléments du profil choisi et quitte (utilisé par les assistants).
+.PARAMETER Json
+    Sortie JSON pour -ListerProfils.
+.PARAMETER KeyPath
+    Chemin de la clé (point de montage sous Linux, ex. /media/moi/Ventoy). Sinon : détection automatique.
 .PARAMETER Langue
     Langue du contenu de la clé (ISO Windows, Office, clavier) : fr, en, es, de, pt…
     (codes définis dans le profil, rubrique Langues). Défaut : LangueDefaut du profil.
@@ -59,9 +69,9 @@
     contenu. EFFACE le disque : exige -ConfirmerEffacement EFFACER-<numéro> et les droits administrateur.
     Disques USB/SD uniquement, jamais le disque système ni celui où se trouve le kit.
 .PARAMETER Disque
-    Numéro du disque (Get-Disk, ou liste de l'assistant) pour -InstallerVentoy.
+    Disque pour -InstallerVentoy : numéro sous Windows (Get-Disk), /dev/sdX sous Linux (lsblk).
 .PARAMETER ConfirmerEffacement
-    Confirmation explicite de l'effacement : « EFFACER-<numéro du disque> ».
+    Confirmation explicite de l'effacement : « EFFACER-<numéro> » (Windows) ou « EFFACER-sdX » (Linux).
 .PARAMETER VentoyGPT
     Table de partitions GPT au lieu de MBR (défaut Ventoy).
 .PARAMETER VentoySansSecureBoot
@@ -89,8 +99,12 @@
 #>
 [CmdletBinding()]
 param(
-    [string] $Profil = 'windows11-bureautique',
+    [string] $Profil = '',
+    [ValidateSet('Windows', 'Linux')] [string] $Systeme,
+    [ValidateSet('Bureautique', 'Developpement')] [string] $Usage,
     [switch] $ListerProfils,
+    [switch] $ListerElements,
+    [switch] $Json,
     [string] $Langue,
     [string] $DriveLetter,
     [switch] $SansOffice,
@@ -105,7 +119,8 @@ param(
     [string] $CachePath,
     [string] $LogFile,
     [switch] $InstallerVentoy,
-    [int] $Disque = -1,
+    [string] $Disque,
+    [string] $KeyPath,
     [string] $ConfirmerEffacement,
     [switch] $VentoyGPT,
     [switch] $VentoySansSecureBoot,
@@ -123,17 +138,39 @@ $kitRoot = $PSScriptRoot
 $kitVersion = '0.0.0'
 $versionFile = Join-Path $kitRoot 'VERSION'
 if (Test-Path -LiteralPath $versionFile) { $kitVersion = (Get-Content -LiteralPath $versionFile -TotalCount 1).Trim() }
-foreach ($m in @('Report', 'Drive', 'Budget', 'Download', 'Sync', 'Backup', 'Ventoy')) {
-    Import-Module (Join-Path $kitRoot "modules\$m.psm1") -Force -DisableNameChecking
+foreach ($m in @('Report', 'Drive', 'Budget', 'Download', 'Sync', 'Backup', 'Ventoy', 'Profile')) {
+    Import-Module (Join-Path $kitRoot "modules/$m.psm1") -Force -DisableNameChecking
 }
 
 # ---------------------------------------------------------------------- profils disponibles
-$profileDir = Join-Path $kitRoot 'config\profils'
+$profileDir = Join-Path $kitRoot 'config/profils'
+$allProfiles = Get-KitProfileList -Directory $profileDir
+
 if ($ListerProfils) {
-    foreach ($pf in @(Get-ChildItem -LiteralPath $profileDir -Filter '*.psd1' | Sort-Object Name)) {
-        $d = Import-PowerShellDataFile -Path $pf.FullName
-        Write-Host ("{0,-28} {1}" -f $pf.BaseName, $d.Description)
+    if ($Json) { $allProfiles | Select-Object Name, Nom, Systeme, Usage, Description | ConvertTo-Json -Depth 3 -Compress; exit 0 }
+    foreach ($p in $allProfiles) { Write-Host ("{0,-28} {1,-8} {2,-14} {3}" -f $p.Name, $p.Systeme, $p.Usage, $p.Description) }
+    exit 0
+}
+# Profil : par nom (-Profil), ou par système + usage (-Systeme / -Usage), sinon profil par défaut
+if (-not $Profil) {
+    if ($Systeme -or $Usage) {
+        $match = @($allProfiles | Where-Object { (-not $Systeme -or $_.Systeme -eq $Systeme) -and (-not $Usage -or $_.Usage -eq $Usage) })
+        if ($match.Count -eq 0) { Write-Error "Aucun profil pour Systeme=$Systeme Usage=$Usage."; exit 2 }
+        $Profil = $match[0].Name
     }
+    else { $Profil = 'windows11-bureautique' }
+}
+if ($ListerElements) {
+    # Éléments du profil en JSON (assistants graphiques, Windows et Linux)
+    $pd = @($allProfiles | Where-Object { $_.Name -eq $Profil }) | Select-Object -First 1
+    if (-not $pd) { Write-Error "Profil « $Profil » introuvable."; exit 2 }
+    $out = [ordered]@{ Profil = $pd.Name; Nom = $pd.Nom; Systeme = $pd.Systeme; Usage = $pd.Usage; Langues = @(); Items = @() }
+    if ($pd.Data.ContainsKey('Langues')) { $out.Langues = @($pd.Data.Langues.Keys | Sort-Object) }
+    $out.Items = @($pd.Data.Items | ForEach-Object {
+            [ordered]@{ Name = $_.Name; Category = [string]$_['Category']; Type = $_.Type
+                Default = -not ($_.ContainsKey('Default') -and -not $_.Default); SizeMB = [int]$_['EstimatedSizeMB']; Mode = [string]$_['Mode'] }
+        })
+    $out | ConvertTo-Json -Depth 4 -Compress
     exit 0
 }
 
@@ -144,10 +181,11 @@ $phase = 'init'
 [void](Initialize-KitLog -LogDirectory (Join-Path $kitRoot 'logs') -LogFile $LogFile)
 
 try {
-    Write-KitLog -Level STEP -Message ("Kit Ventoy v{2} — {0}{1}" -f (Get-Date -Format 'dd/MM/yyyy HH:mm'), $(if ($DryRun) { ' — MODE SIMULATION' } else { '' }), $kitVersion)
+    Write-KitLog -Level STEP -Message ("Alchemist v{2} — {0}{1}" -f (Get-Date -Format 'dd/MM/yyyy HH:mm'), $(if ($DryRun) { ' — MODE SIMULATION' } else { '' }), $kitVersion)
     Write-KitLog -Message ("PowerShell {0} ({1})" -f $PSVersionTable.PSVersion, $PSVersionTable.PSEdition)
     Initialize-KitNetwork
-    Set-KitSignaturePolicy -Disabled:$SansVerifSignature
+    # Authenticode n'existe que sous Windows : sous Linux, seuls les SHA256 publiés font foi
+    Set-KitSignaturePolicy -Disabled:($SansVerifSignature -or -not (Test-KitWindows))
     if ($SansVerifSignature) { Write-KitLog -Level WARN -Message 'Vérification des signatures Authenticode DÉSACTIVÉE (les SHA256 publiés restent contrôlés).' }
 
     # ------------------------------------------------------------------ configuration (profil)
@@ -156,7 +194,7 @@ try {
         $known = (@(Get-ChildItem -LiteralPath $profileDir -Filter '*.psd1') | ForEach-Object BaseName) -join ', '
         throw "Profil « $Profil » introuvable. Profils disponibles : $known"
     }
-    $config = Import-PowerShellDataFile -Path $profilePath
+    $config = Get-KitProfile -Directory $profileDir -Name $Profil
     Write-KitLog -Message ("Profil : {0} — {1}" -f $Profil, $config.Nom)
     $allItems = @($config.Items)
 
@@ -193,17 +231,18 @@ try {
     if ($SansOffice) { $items = @($items | Where-Object { $_.Type -ne 'Office' }) }
     $marginBytes = [double]$config.MarginMB * 1MB
 
-    # ------------------------------------------------------------------ 1. clé
     # ------------------------------------------------------------------ 0b. installation de Ventoy (option)
+    $installedRoot = ''
     if ($InstallerVentoy) {
         $phase = 'ventoy'
+        if (-not $Disque) { throw 'Précisez le disque : -Disque <numéro> (Windows, voir Get-Disk) ou -Disque /dev/sdX (Linux, voir lsblk).' }
+        $diskName = Split-Path -Leaf $Disque
         Write-KitLog -Level STEP -Message "0. Installation de Ventoy sur le disque $Disque (le disque sera EFFACÉ)"
-        if ($Disque -lt 0) { throw 'Précisez le disque : -Disque <numéro> (voir Get-Disk ou la liste de l''assistant).' }
-        if ($ConfirmerEffacement -cne "EFFACER-$Disque") {
-            throw "Confirmation manquante : ajoutez -ConfirmerEffacement EFFACER-$Disque (toutes les données du disque $Disque seront perdues)."
+        if ($ConfirmerEffacement -cne "EFFACER-$diskName") {
+            throw "Confirmation manquante : ajoutez -ConfirmerEffacement EFFACER-$diskName (toutes les données du disque $Disque seront perdues)."
         }
-        $target = Assert-KitVentoyTarget -DiskNumber $Disque -KitRoot $kitRoot
-        Write-KitLog -Message ("Disque cible : {0} — {1} — {2} Go — lettres : {3}" -f $target.Number, $target.Model, $target.SizeGB, ($target.Letters -join ', '))
+        $target = Assert-KitVentoyTarget -Disk $Disque -KitRoot $kitRoot
+        Write-KitLog -Message ("Disque cible : {0} — {1} — {2} Go — volumes : {3}" -f $target.Id, $target.Model, $target.SizeGB, ($target.Letters -join ', '))
         if ($DryRun) {
             Write-KitLog -Level WARN -Message 'Simulation : Ventoy serait installé (rien n''est effacé en simulation).'
             if (-not $target.IsVentoy) {
@@ -213,68 +252,85 @@ try {
             }
         }
         else {
-            if (-not (Test-KitAdmin)) { throw 'L''installation de Ventoy nécessite les droits administrateur (relancez en administrateur ou via l''assistant).' }
+            if (-not (Test-KitAdmin)) { throw 'L''installation de Ventoy nécessite les droits administrateur (Windows) ou root (Linux : sudo).' }
             if ($SauvegardeVers) {
                 foreach ($l in $target.Letters) {
-                    $bk = Backup-KitDrive -KeyRoot ("{0}:\" -f $l) -Destination $SauvegardeVers -Manifest @{} -Complete
-                    if ($bk.Files -gt 0) { Add-KitResult -Name "Sauvegarde $l`:" -Status 'OK' -Detail ("{0} fichier(s) dans {1}" -f $bk.Files, $bk.Folder) -SizeMB ($bk.Bytes / 1MB) }
+                    $volRoot = $(if (Test-KitWindows) { "$($l):\" } else { $l.TrimEnd('/') + '/' })
+                    $bk = Backup-KitDrive -KeyRoot $volRoot -Destination $SauvegardeVers -Manifest @{} -Complete
+                    if ($bk.Files -gt 0) { Add-KitResult -Name "Sauvegarde $l" -Status 'OK' -Detail ("{0} fichier(s) dans {1}" -f $bk.Files, $bk.Folder) -SizeMB ($bk.Bytes / 1MB) }
                 }
                 $SauvegardeVers = $null   # la clé sera vierge : rien d'autre à sauvegarder ensuite
             }
-            $ventoy = Save-KitVentoy -ToolsDir (Join-Path ([IO.Path]::GetTempPath()) 'kit-ventoy-ventoy')
-            Invoke-KitVentoy2Disk -Exe $ventoy.Exe -Mode Install -DiskNumber $Disque -Gpt:$VentoyGPT -NoSecureBoot:$VentoySansSecureBoot -FileSystem $VentoyFS -Confirm:$false
-            $DriveLetter = Wait-KitVentoyVolume -DiskNumber $Disque -Label $config.VolumeLabel
-            Add-KitResult -Name 'Ventoy' -Status 'OK' -Detail ("Ventoy {0} installé sur le disque {1} ({2}:)" -f $ventoy.Version, $Disque, $DriveLetter)
+            $ventoy = Save-KitVentoy -ToolsDir (Join-Path ([IO.Path]::GetTempPath()) 'alchemist-ventoy')
+            Invoke-KitVentoy2Disk -Exe $ventoy.Exe -Mode Install -Disk $target.Id -Gpt:$VentoyGPT -NoSecureBoot:$VentoySansSecureBoot -FileSystem $VentoyFS -Label $config.VolumeLabel -Confirm:$false
+            $installedRoot = Wait-KitVentoyVolume -Disk $target.Id -Label $config.VolumeLabel
+            Add-KitResult -Name 'Ventoy' -Status 'OK' -Detail ("Ventoy {0} installé sur le disque {1} ({2})" -f $ventoy.Version, $target.Id, $installedRoot)
         }
     }
+
+    # ------------------------------------------------------------------ 1. clé
     $phase = 'drive'
     Write-KitLog -Level STEP -Message '1. Contrôle de la clé'
-    if (-not $DriveLetter) {
+    $rootToCheck = ''
+    if ($installedRoot) { $rootToCheck = $installedRoot }
+    elseif ($KeyPath) { $rootToCheck = $KeyPath }
+    elseif ($DriveLetter) { $rootToCheck = Get-KitDriveRoot -DriveLetter ([char]$DriveLetter) }
+    else {
         # Détection automatique : une seule clé « Ventoy » branchée => on la prend
         $candidates = @(Find-KitVentoyDrive -ExpectedLabel $config.VolumeLabel)
-        if ($candidates.Count -eq 0) { throw "Aucune clé « $($config.VolumeLabel) » détectée. Branchez la clé Ventoy (installée avec Ventoy2Disk) ou précisez -DriveLetter." }
-        if ($candidates.Count -gt 1) { throw ("Plusieurs clés Ventoy détectées ({0}) : précisez -DriveLetter." -f (($candidates | ForEach-Object Root) -join ', ')) }
-        $DriveLetter = $candidates[0].Letter
-        Write-KitLog -Message ("Clé Ventoy détectée automatiquement : {0}" -f $candidates[0].Root)
+        if ($candidates.Count -eq 0) { throw "Aucune clé « $($config.VolumeLabel) » détectée. Branchez (et montez) la clé Ventoy, cochez « Clé neuve » pour installer Ventoy, ou précisez -DriveLetter / -KeyPath." }
+        if ($candidates.Count -gt 1) { throw ("Plusieurs clés Ventoy détectées ({0}) : précisez -DriveLetter (Windows) ou -KeyPath (Linux)." -f (($candidates | ForEach-Object Root) -join ', ')) }
+        $rootToCheck = $candidates[0].Root
+        Write-KitLog -Message ("Clé Ventoy détectée automatiquement : {0}" -f $rootToCheck)
     }
-    $drive = Test-KitDrive -DriveLetter ([char]$DriveLetter) -ExpectedLabel $config.VolumeLabel -MinFreeBytes $marginBytes
+    $drive = Test-KitDrive -Root $rootToCheck -ExpectedLabel $config.VolumeLabel -MinFreeBytes $marginBytes
     $keyRoot = $drive.Root
     $freeBefore = $drive.FreeBytes
 
     if ($MettreAJourVentoy) {
         $phase = 'ventoy'
-        $dn = (Get-Partition -DriveLetter ([char]$DriveLetter)).DiskNumber
-        [void](Assert-KitVentoyTarget -DiskNumber $dn)
-        if ($DryRun) { Write-KitLog -Level WARN -Message "Simulation : Ventoy serait mis à jour sur le disque $dn (sans effacement)." }
+        if (Test-KitWindows) { $diskId = [string](Get-Partition -DriveLetter $keyRoot.Substring(0, 1)).DiskNumber }
         else {
-            if (-not (Test-KitAdmin)) { throw 'La mise à jour de Ventoy nécessite les droits administrateur.' }
-            $ventoy = Save-KitVentoy -ToolsDir (Join-Path ([IO.Path]::GetTempPath()) 'kit-ventoy-ventoy')
-            Invoke-KitVentoy2Disk -Exe $ventoy.Exe -Mode Update -DiskNumber $dn -Confirm:$false
-            [void](Wait-KitVentoyVolume -DiskNumber $dn -Label $config.VolumeLabel)
+            $mp = $keyRoot.TrimEnd('/')
+            $diskId = [string](@(Get-KitLinuxBlock | Where-Object { $_.mountpoint -eq $mp }) | Select-Object -First 1).ParentDisk.path
+        }
+        [void](Assert-KitVentoyTarget -Disk $diskId)
+        if ($DryRun) { Write-KitLog -Level WARN -Message "Simulation : Ventoy serait mis à jour sur le disque $diskId (sans effacement)." }
+        else {
+            if (-not (Test-KitAdmin)) { throw 'La mise à jour de Ventoy nécessite les droits administrateur (Windows) ou root (Linux : sudo).' }
+            $ventoy = Save-KitVentoy -ToolsDir (Join-Path ([IO.Path]::GetTempPath()) 'alchemist-ventoy')
+            Invoke-KitVentoy2Disk -Exe $ventoy.Exe -Mode Update -Disk $diskId -Confirm:$false
+            $keyRoot = Wait-KitVentoyVolume -Disk $diskId -Label $config.VolumeLabel
             Add-KitResult -Name 'Ventoy' -Status 'OK' -Detail ("Ventoy mis à jour en {0} (données conservées)" -f $ventoy.Version)
         }
         $phase = 'drive'
     }
+
+    # Zone de préparation : par défaut SUR LA CLÉ (rien de lourd sur l'ordinateur ; la mise en place
+    # est alors un simple déplacement). Dans le dossier du kit s'il est lui-même sur la clé.
     $cacheRoot = $CachePath
-    if (-not $cacheRoot) { $cacheRoot = Join-Path $kitRoot 'cache' }
+    if (-not $cacheRoot) {
+        if ([IO.Path]::GetFullPath($kitRoot).StartsWith($keyRoot, [StringComparison]::OrdinalIgnoreCase)) { $cacheRoot = Join-Path $kitRoot 'cache' }
+        else { $cacheRoot = Join-Path $keyRoot 'kit-cache' }
+    }
     $cacheRoot = [IO.Path]::GetFullPath($cacheRoot)
     if (-not $DryRun -and -not (Test-Path -LiteralPath $cacheRoot)) { New-Item -ItemType Directory -Path $cacheRoot -Force | Out-Null }
-    if ([IO.Path]::GetPathRoot($cacheRoot) -ne $keyRoot) {
+    if (-not $cacheRoot.StartsWith($keyRoot, [StringComparison]::OrdinalIgnoreCase)) {
         Write-KitLog -Level WARN -Message "Le cache ($cacheRoot) n'est pas sur la clé : la mise en place sera une copie (plus lente)."
     }
     # Outils (Fido, descripteur Office) : hors clé en DryRun
     $toolsDir = Join-Path $cacheRoot '_outils'
-    if ($DryRun) { $toolsDir = Join-Path ([IO.Path]::GetTempPath()) 'kit-ventoy-outils' }
-    $officeConfig = Join-Path $kitRoot ('config\' + $(if ($config.ContainsKey('OfficeConfig')) { $config.OfficeConfig } else { 'office-config.xml' }))
+    if ($DryRun) { $toolsDir = Join-Path ([IO.Path]::GetTempPath()) 'alchemist-outils' }
+    $officeConfig = Join-Path $kitRoot ('config/' + $(if ($config.ContainsKey('OfficeConfig')) { $config.OfficeConfig } else { 'office-config.xml' }))
     $manifest = Read-KitManifest -KeyRoot $keyRoot
     Write-KitLog -Message ("MANIFEST : {0} fichier(s) déjà gérés par le kit" -f $manifest.Count)
 
     # ------------------------------------------------------------------ 0. sauvegarde (option)
     if ($SauvegardeVers) {
         $phase = 'backup'
-        # Le dossier du kit lui-même (s'il est sur la clé) n'est pas une donnée à sauvegarder
-        $exclude = @()
-        if ([IO.Path]::GetPathRoot($kitRoot) -ieq $keyRoot) { $exclude += (Split-Path -Leaf $kitRoot) }
+        # Ni le dossier du kit (s'il est sur la clé) ni la zone de préparation ne sont des données
+        $exclude = @('kit-cache')
+        if ([IO.Path]::GetFullPath($kitRoot).StartsWith($keyRoot, [StringComparison]::OrdinalIgnoreCase)) { $exclude += (Split-Path -Leaf $kitRoot) }
         if ($DryRun) {
             $list = Get-KitBackupList -KeyRoot $keyRoot -Manifest $manifest -ExcludeDirs $exclude -Complete:$SauvegardeComplete
             $sum = 0.0; foreach ($f in $list) { $sum += $f.Length }
@@ -286,10 +342,14 @@ try {
         }
     }
 
-    if (-not $SkipDownload -and -not (Get-Command winget -ErrorAction SilentlyContinue)) {
+    # Éléments propres à Windows (winget, Office Deployment Tool) : à préparer depuis Windows
+    $windowsOnly = @($items | Where-Object { $_.Type -in @('Winget', 'Office') })
+    if ($windowsOnly.Count -gt 0 -and -not (Test-KitWindows)) {
+        throw ("Ces éléments se préparent depuis Windows (winget / Office Deployment Tool) : {0}. Depuis Linux, choisissez un profil Linux ou décochez-les." -f (($windowsOnly | ForEach-Object Name) -join ', '))
+    }
+    if (-not $SkipDownload -and @($items | Where-Object { $_.Type -eq 'Winget' }).Count -gt 0 -and -not (Get-Command winget -ErrorAction SilentlyContinue)) {
         throw "winget est introuvable. Installez « App Installer » depuis le Microsoft Store, ou utilisez -SkipDownload."
     }
-
     # ------------------------------------------------------------------ 2. sources
     $phase = 'resolve'
     Write-KitLog -Level STEP -Message '2. Résolution des sources officielles'
@@ -322,8 +382,8 @@ try {
 
     # ------------------------------------------------------------------ 3. budget
     $phase = 'budget'
-    $plans = Select-KitBudget -Plans $plans -FreeBytes (Get-KitFreeSpace -DriveLetter $DriveLetter) -MarginBytes $marginBytes
-    Show-KitBudget -Plans $plans -FreeBytes (Get-KitFreeSpace -DriveLetter $DriveLetter) -MarginBytes $marginBytes
+    $plans = Select-KitBudget -Plans $plans -FreeBytes (Get-KitFreeSpace -Root $keyRoot) -MarginBytes $marginBytes
+    Show-KitBudget -Plans $plans -FreeBytes (Get-KitFreeSpace -Root $keyRoot) -MarginBytes $marginBytes
 
     if ($DryRun) {
         foreach ($p in $plans) {
@@ -338,7 +398,7 @@ try {
                 default  { Add-KitResult -Name $p.Name -Status 'IGNORÉ' -Detail $p.Detail -SizeMB ($p.NewBytes / 1MB) }
             }
         }
-        $freeAfter = Get-KitFreeSpace -DriveLetter $DriveLetter
+        $freeAfter = Get-KitFreeSpace -Root $keyRoot
         $exitCode = Show-KitReport -FreeBeforeBytes $freeBefore -FreeAfterBytes $freeAfter -DryRun
         exit $exitCode
     }
@@ -365,7 +425,7 @@ try {
             Write-KitLog -Level STEP -Message ("--- {0} {1}" -f $p.Name, $p.Version)
             # L'espace est remesuré juste avant : jamais de dépassement, même si l'estimation était fausse
             $need = Get-KitPlanNeed -Plan $p
-            $free = Get-KitFreeSpace -DriveLetter $DriveLetter
+            $free = Get-KitFreeSpace -Root $keyRoot
             if ($need -gt ($free - $marginBytes)) {
                 Add-KitResult -Name $p.Name -Status 'IGNORÉ' -Detail ("Place insuffisante : besoin {0}, libre {1} (marge {2})" -f (Format-KitSize $need), (Format-KitSize $free), (Format-KitSize $marginBytes))
                 continue
@@ -399,13 +459,20 @@ try {
         $gen = Join-Path $cacheRoot '_kit'
         if (Test-Path -LiteralPath $gen) { Remove-Item -LiteralPath $gen -Recurse -Force }
         New-Item -ItemType Directory -Path $gen -Force | Out-Null
-        $payload = Join-Path $kitRoot $(if ($config.ContainsKey('Payload')) { $config.Payload } else { 'payload\windows' })
+        $payload = Join-Path $kitRoot $(if ($config.ContainsKey('Payload')) { $config.Payload } else { 'payload/windows' })
         Copy-Item -Path (Join-Path $payload '*') -Destination $gen -Recurse -Force
-        # Version du kit embarquée sur la clé (affichée par l'assistant du poste)
-        [IO.File]::WriteAllText((Join-Path $gen 'postinstall\VERSION'), "$kitVersion`n", (New-Object Text.UTF8Encoding($false)))
         $tz = 'Greenwich Standard Time'
         if ($config.ContainsKey('TimeZone')) { $tz = $config.TimeZone }
-        [void](New-KitCatalogue -Items $allItems -KeyRoot $keyRoot -Destination (Join-Path $gen 'postinstall\catalogue.json') -ProfileName $Profil -TimeZone $tz)
+        if (Test-Path -LiteralPath (Join-Path $gen 'postinstall')) {
+            # Windows : version embarquée et catalogue de la post-installation
+            [IO.File]::WriteAllText((Join-Path $gen 'postinstall/VERSION'), "$kitVersion`n", (New-Object Text.UTF8Encoding($false)))
+            [void](New-KitCatalogue -Items $allItems -KeyRoot $keyRoot -Destination (Join-Path $gen 'postinstall/catalogue.json') -ProfileName $Profil -TimeZone $tz)
+        }
+        if (Test-Path -LiteralPath (Join-Path $gen 'linux')) {
+            # Linux : profil d'usage lu par le script de post-installation
+            $conf = @("KIT_VERSION=$kitVersion", "KIT_PROFIL=$Profil", "KIT_USAGE=$($config.Usage)", "KIT_LANGUE=$Langue", "KIT_TZ=$tz")
+            [IO.File]::WriteAllText((Join-Path $gen 'linux/kit.conf'), (($conf -join "`n") + "`n"), (New-Object Text.UTF8Encoding($false)))
+        }
 
         # Jetons des modèles (nom de l'ISO, langue, clavier, fuseau) remplacés dans les fichiers texte
         $isoItem = @($allItems | Where-Object { $_.Type -eq 'WindowsIso' }) | Select-Object -First 1
@@ -416,7 +483,7 @@ try {
             '{{TIMEZONE}}'     = $tz
             '{{KIT_VERSION}}'  = $kitVersion
         }
-        foreach ($tf in @(Get-ChildItem -LiteralPath $gen -Recurse -File -Include '*.xml', '*.json', '*.txt')) {
+        foreach ($tf in @(Get-ChildItem -LiteralPath $gen -Recurse -File -Include '*.xml', '*.json', '*.txt', '*.md')) {
             $content = [IO.File]::ReadAllText($tf.FullName)
             if ($content -notmatch '\{\{[A-Z_]+\}\}') { continue }
             foreach ($k in $tokens.Keys) { $content = $content.Replace($k, $tokens[$k]) }
@@ -426,31 +493,31 @@ try {
 
         # ventoy.json : on ne remplace jamais un fichier de configuration Ventoy personnel
         $ventoyJson = 'ventoy/ventoy.json'
-        if ((Test-Path -LiteralPath (Join-Path $keyRoot 'ventoy\ventoy.json')) -and -not $manifest.ContainsKey($ventoyJson)) {
-            Remove-Item -LiteralPath (Join-Path $gen 'ventoy\ventoy.json') -Force
+        if ((Test-Path -LiteralPath (Join-Path $gen 'ventoy/ventoy.json')) -and (Test-Path -LiteralPath (Join-Path $keyRoot 'ventoy/ventoy.json')) -and -not $manifest.ContainsKey($ventoyJson)) {
+            Remove-Item -LiteralPath (Join-Path $gen 'ventoy/ventoy.json') -Force
             Write-KitLog -Level WARN -Message "Un ventoy.json personnel existe : il est conservé. Pour proposer l'installation hors ligne, ajoutez-y le bloc « auto_install » de payload\ventoy\ventoy.json."
         }
-        $res = Sync-KitStage -StageDir $gen -KeyRoot $keyRoot -TargetDir '' -Manifest $manifest -ObsoleteScope @('postinstall/', 'ventoy/script/')
+        $res = Sync-KitStage -StageDir $gen -KeyRoot $keyRoot -TargetDir '' -Manifest $manifest -ObsoleteScope @('postinstall/', 'ventoy/script/', 'linux/')
         Write-KitManifest -KeyRoot $keyRoot -Manifest $manifest
         if ($res.Conflicts.Count -gt 0) {
             Add-KitResult -Name 'Post-installation' -Status 'ÉCHEC' -Detail ("Conflit(s) : {0}" -f ($res.Conflicts -join ', '))
         }
         else {
-            Add-KitResult -Name 'Post-installation' -Status 'OK' -Detail 'postinstall\, catalogue.json, LISEZMOI.txt, ventoy\'
+            Add-KitResult -Name 'Post-installation' -Status 'OK' -Detail ((@(Get-ChildItem -LiteralPath $keyRoot -Directory | Where-Object { $_.Name -in @('postinstall', 'linux', 'ventoy') } | ForEach-Object Name) -join ', ') + ', LISEZMOI')
         }
     }
     catch {
         Add-KitResult -Name 'Post-installation' -Status 'ÉCHEC' -Detail $_.Exception.Message
     }
 
-    $freeAfter = Get-KitFreeSpace -DriveLetter $DriveLetter
+    $freeAfter = Get-KitFreeSpace -Root $keyRoot
     $exitCode = Show-KitReport -FreeBeforeBytes $freeBefore -FreeAfterBytes $freeAfter
 }
 catch {
     Write-KitLog -Level ERROR -Message $_.Exception.Message
     Write-KitLog -Level ERROR -Message ("Emplacement : {0}" -f $_.InvocationInfo.PositionMessage)
     if ($phase -eq 'critical') { $exitCode = 3 } else { $exitCode = 2 }
-    try { if ($freeBefore -ge 0) { $freeAfter = Get-KitFreeSpace -DriveLetter $DriveLetter } } catch { $freeAfter = -1 }
+    try { if ($freeBefore -ge 0) { $freeAfter = Get-KitFreeSpace -Root $keyRoot } } catch { $freeAfter = -1 }
     [void](Show-KitReport -FreeBeforeBytes $freeBefore -FreeAfterBytes $freeAfter -DryRun:$DryRun)
 }
 exit $exitCode

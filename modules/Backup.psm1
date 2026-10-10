@@ -83,7 +83,7 @@ function Backup-KitDrive {
     $i = 0
     foreach ($f in $list) {
         $i++
-        $target = Join-Path $folder ($f.Rel.Replace('/', '\'))
+        $target = Join-Path $folder (ConvertTo-KitLocalPath $f.Rel)
         $dir = Split-Path -Parent $target
         if ($PSCmdlet.ShouldProcess($f.Full, 'Sauvegarder')) {
             if (-not (Test-Path -LiteralPath $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }

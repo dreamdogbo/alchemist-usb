@@ -1,104 +1,47 @@
-# Feuille de route
+# Feuille de route d'Alchemist
 
-Objectif : **une seule clé, un seul assistant** pour préparer n'importe quel poste — Windows ou Linux —
-selon **le système**, **l'usage** et **le profil de l'utilisateur**, avec une attention particulière aux
-développeurs qui passent de Windows à Linux.
+Objectif : **une clé, un assistant**, pour transformer n'importe quel PC en poste prêt à l'emploi —
+Windows ou Linux — selon le **système**, l'**usage** et le **profil de l'utilisateur**, avec une attention
+particulière aux développeurs qui passent de Windows à Linux.
 
-Les versions suivent [SemVer](https://semver.org/lang/fr/) ; l'avancement réel est consigné dans le
-[CHANGELOG](CHANGELOG.md).
+Versions : [SemVer](https://semver.org/lang/fr/). Avancement réel : [CHANGELOG](CHANGELOG.md).
 
----
+## Fait
 
-## v1.1 — La clé de A à Z
+- [x] **v1.0** — Windows 11 hors ligne, Microsoft 365 ou suites gratuites, logiciels, pilotes, ClamAV,
+      assistants graphiques FR/EN, multiboot Linux.
+- [x] **v1.1** — Installation et mise à jour de Ventoy depuis le kit, avec garde-fous.
+- [x] **v1.2** — Alchemist : parcours Système → Usage → Versions, profils hérités, stack développeur Windows,
+      post-installation Linux multi-distributions (Ubuntu, Mint, Debian, Fedora), Microsoft 365 sous Linux,
+      création (GIMP, Inkscape, Krita, Kdenlive, ArtCraft…), moteur et assistant sous Linux, tests Linux en CI.
 
-- [x] **Installer Ventoy** sur une clé vierge depuis l'assistant (release officielle `ventoy/Ventoy`,
-      SHA256 vérifié, ligne de commande officielle `Ventoy2Disk VTOYCLI`), puis préparer le contenu
-      **en une seule opération**.
-- [x] **Mettre à jour Ventoy** sur une clé existante sans effacer les données (mode *Update*).
-- [x] Garde-fous : disques USB uniquement, jamais le disque système, confirmation tapée, sauvegarde proposée.
-- [ ] Menu Ventoy lisible (`menu_alias`) : « Windows 11 (FR) », « Ubuntu 26.04 LTS »…
+## v1.3 — Linux sans effort
 
-## v1.2 — Profils par usage (Windows)
+- [ ] **Installation Linux automatisée** depuis le menu Ventoy : Ubuntu *autoinstall* (cloud-init), Fedora
+      *kickstart*, Debian *preseed* — langue, clavier, compte, usage pré-réglés.
+- [ ] Lancement automatique de la post-installation au premier démarrage.
+- [ ] **Paquets Linux hors ligne** sur la clé (.deb / .rpm / Flatpak bundles) pour les postes sans Internet.
+- [ ] Noms lisibles dans le menu Ventoy (`menu_alias`) et persistance pour les systèmes « live ».
 
-L'assistant demande **qui** va utiliser le poste et **pour quoi faire** :
+## v1.4 — Nouveaux usages
 
-| Profil | Contenu ajouté |
+| Usage | Contenu envisagé |
 | --- | --- |
-| Bureautique | profil actuel |
-| Développement | VS Code, Git, Windows Terminal, PowerShell 7, Python, Node.js LTS, Go, Rust (rustup), JDK LTS, Docker Desktop, WSL 2 + Ubuntu, Postman/Bruno, DBeaver, JetBrains Toolbox |
-| Statistiques / données | R + RStudio, Python (Anaconda/Miniforge), Jupyter, JASP, PSPP, QGIS, Power BI Desktop |
-| Graphisme / vidéo | Inkscape, GIMP, Krita, Blender, Kdenlive, DaVinci Resolve, OBS Studio, Audacity, HandBrake |
+| Statistiques / données | R + RStudio, Python data (Jupyter, pandas, Polars via uv), JASP, PSPP, QGIS, DuckDB, DBeaver |
+| Graphisme / vidéo | Création par défaut : GIMP, Krita, Inkscape, Kdenlive, Blender, OBS, DaVinci Resolve (guidé) |
+| Enseignement / école | suites bureautiques, outils pédagogiques, contrôle parental |
 
-## v2.0 — Outil universel (Windows, Linux, macOS)
+## v2.0 — Migration et interface universelle
 
-Le kit doit pouvoir **créer une clé depuis n'importe quel système** :
+- [ ] **Assistant de migration Windows → Linux** : données utilisateur, navigateurs, clés SSH, `.gitconfig`,
+      extensions VS Code, liste des logiciels Windows → équivalents Linux proposés automatiquement.
+- [ ] Interface graphique unique multiplateforme (Avalonia UI ou interface web locale) remplaçant WinForms
+      et zenity ; la ligne de commande reste identique.
+- [ ] Préparer aussi les clés Windows complètes depuis Linux (sources directes sans winget).
+- [ ] Autres langues d'interface (ES, DE, PT, AR…) et traduction des journaux.
 
-- [ ] Moteur commun en **PowerShell 7** (déjà multiplateforme) ; les parties propres à Windows (winget, Fido,
-      WinForms, Authenticode) deviennent des *fournisseurs* interchangeables.
-- [ ] Ventoy : `Ventoy2Disk.exe` sous Windows, `Ventoy2Disk.sh` sous Linux (même logique de garde-fous).
-- [ ] Interface graphique multiplateforme (Avalonia UI ou interface web locale) remplaçant WinForms ;
-      la ligne de commande reste identique partout.
-- [ ] Téléchargements Windows depuis Linux : liens officiels directs (Microsoft, éditeurs, GitHub) quand winget
-      n'est pas disponible.
+## Idées
 
-## v2.x — Linux de première classe (priorité : bascule Windows → Linux)
-
-### Installation automatisée
-
-- [ ] Choix **Ubuntu LTS** (recommandé), Fedora Workstation ou Linux Mint, installés en automatique par
-      Ventoy (Ubuntu *autoinstall* / cloud-init, Fedora *kickstart*), avec un compte et une langue choisis.
-- [ ] Script de post-installation Linux (`postinstall-linux/install.sh`) équivalent à `Install-Poste.ps1` :
-      profils, détection de l'existant, journal, bilan ; paquets **apt/dnf + Flatpak (Flathub)**.
-- [ ] Mode hors ligne : paquets `.deb`/`.rpm` et bundles Flatpak embarqués sur la clé, comme pour Windows.
-
-### Profil « Développeur Linux »
-
-| Besoin | Outils |
-| --- | --- |
-| Éditeurs / IDE | VS Code (dépôt Microsoft), JetBrains Toolbox, Neovim |
-| Conteneurs | **Docker Engine + Compose** (dépôt officiel Docker) ou **Docker Desktop for Linux**, Podman, Portainer |
-| Langages | Python (pyenv/uv), Node.js LTS (nvm/fnm), Go, Rust (rustup), JDK LTS (SDKMAN), .NET SDK |
-| Outils | Git, GitHub CLI, zsh + Oh My Zsh, tmux, kubectl, Helm, Terraform, Ansible, AWS/Azure/GCP CLI |
-| Bases de données | DBeaver, PostgreSQL/MySQL en conteneurs |
-| API | Bruno, Postman |
-
-### Microsoft 365 sous Linux
-
-Office n'existe pas en version native Linux. Solutions proposées, de la plus simple à la plus complète :
-
-1. **Microsoft 365 web** installé en applications (PWA Edge/Chrome) : Word, Excel, PowerPoint, Outlook, Teams —
-   fidélité totale des documents, nécessite Internet.
-2. **Suites compatibles natives** : **ONLYOFFICE** (meilleure compatibilité .docx/.xlsx/.pptx), LibreOffice,
-   WPS Office.
-3. **Office de bureau complet dans une VM Windows intégrée** : **WinApps** / **WinBoat** (open source) lancent
-   Word, Excel, PowerPoint comme des applications Linux (Windows en conteneur Docker/KVM, licence Office requise).
-
-### Équivalents des logiciels Windows / Adobe
-
-| Usage | Équivalents Linux |
-| --- | --- |
-| PDF (Acrobat) | **PDFCraft** (AppImage / Flatpak), Okular, Xournal++, PDF Arranger |
-| Illustrator | **Inkscape** |
-| Photoshop | **GIMP**, **Krita**, Photopea (web) |
-| InDesign | Scribus |
-| Lightroom | darktable, RawTherapee |
-| Premiere / montage vidéo | **Kdenlive**, **DaVinci Resolve** (natif Linux), Shotcut |
-| After Effects | Natron, Blender (compositing) |
-| Enregistrement / streaming | OBS Studio |
-| Audio | Audacity, Ardour |
-| 3D | Blender |
-
-## v2.1 — Assistant de migration Windows → Linux
-
-- [ ] Sauvegarde et transfert des **données utilisateur** (Documents, Bureau, Images, navigateurs).
-- [ ] Reprise des **outils de développement** : clés SSH, `.gitconfig`, dépôts, extensions VS Code
-      (`code --list-extensions`), variables d'environnement.
-- [ ] Liste des logiciels Windows installés → **proposition d'équivalents Linux** (table ci-dessus).
-- [ ] Double démarrage (dual boot) assisté ou installation Linux seule.
-
-## Plus tard
-
-- Autres langues d'interface (ES, DE, PT, AR…) et traduction des journaux techniques.
+- Profils d'entreprise (domaine, VPN, imprimantes), inventaire matériel exporté (CSV/JSON).
 - Packs de pilotes hors ligne sélectifs (réseau, chipset) pour SDIO.
-- Persistance Ventoy pour les systèmes Linux « live ».
-- Interface multiplateforme (créer la clé depuis Linux).
+- Signature des archives de release (Sigstore / cosign).
