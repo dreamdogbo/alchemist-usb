@@ -462,7 +462,24 @@ comp_office365() {
   paquets "podman podman-compose freerdp3-x11 freerdp3-wayland python3 python3-pyside6.qtwidgets python3-pyside6.qtuitools python3-pyside6.qtcore" \
           "podman podman-compose freerdp python3 python3-pyside6"
   lancer usermod -aG kvm "$UTILISATEUR"
+  # Podman sans root : identifiants subordonnés (/etc/subuid, /etc/subgid) pour l'utilisateur
+  if ! grep -q "^$UTILISATEUR:" /etc/subuid 2>/dev/null; then
+    lancer usermod --add-subuids 100000-165535 --add-subgids 100000-165535 "$UTILISATEUR"
+  fi
+  # Session systemd de l'utilisateur (requise par Podman sans root), y compris hors connexion graphique
   lancer loginctl enable-linger "$UTILISATEUR" || true
+  if [ "$SIMULATION" -eq 0 ]; then
+    local uid; uid="$(id -u "$UTILISATEUR")"
+    lancer systemctl start "user@$uid.service" || true
+    for _ in $(seq 1 30); do [ -S "/run/user/$uid/bus" ] && break; sleep 1; done
+    en_session "podman system migrate >/dev/null 2>&1 || true"
+    if ! en_session "podman info >/dev/null 2>&1"; then
+      rouge "  Podman sans root ne fonctionne pas pour $UTILISATEUR :"
+      en_session "podman info 2>&1 | tail -n 8" || true
+      return 1
+    fi
+    echo "  Podman sans root : opérationnel"
+  fi
   tag="$(github_tag eylenburg/linoffice)"
   [ -z "$tag" ] && { jaune "  LinOffice : version introuvable"; return 1; }
   echo "  LinOffice $tag : installation dans ~/.local/bin/linoffice"
