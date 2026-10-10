@@ -297,7 +297,6 @@
             # Snappy Driver Installer Origin : pilotes (open source GPLv3, portable, hors ligne)
             Name = 'SDIO'; Category = 'Outil technicien'; Mode = 'Manuel'; Type = 'Winget'; Priority = 6; TargetDir = 'Logiciels/SDIO'
             WingetId = 'GlennDelahoy.SnappyDriverInstallerOrigin'; Architecture = ''; EstimatedSizeMB = 8
-            FallbackUrl = 'https://sourceforge.net/projects/snappy-driver-installer-origin/files/latest/download'
             Extract = $true; Launcher = 'SDIO_x64*.exe'
             Signer = ''
             Detection = ''; Order = 90

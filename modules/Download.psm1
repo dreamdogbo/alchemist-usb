@@ -402,6 +402,16 @@ function Invoke-KitHttpDownload {
                     if ($len -ne $total) { throw ("téléchargement incomplet ({0} sur {1})" -f (Format-KitSize $len), (Format-KitSize $total)) }
                 }
             }
+            # Un serveur peut renvoyer une page web (erreur, captcha, miroir) au lieu du fichier : refus
+            $head = New-Object byte[] 64
+            $hs = [IO.File]::OpenRead($part)
+            try { $n = $hs.Read($head, 0, 64) } finally { $hs.Dispose() }
+            $start = [Text.Encoding]::ASCII.GetString($head, 0, $n).TrimStart().ToLowerInvariant()
+            $isHtml = $start.StartsWith('<!doctype html') -or $start.StartsWith('<html')
+            if ($isHtml -and $label -notmatch '\.(html?|xml)$') {
+                Remove-Item -LiteralPath $part, $tagFile -Force -ErrorAction SilentlyContinue
+                throw "le serveur a renvoyé une page web au lieu du fichier attendu ($Url)"
+            }
             if (Test-Path -LiteralPath $Destination) { Remove-Item -LiteralPath $Destination -Force }
             Move-Item -LiteralPath $part -Destination $Destination
             Remove-Item -LiteralPath $tagFile -Force -ErrorAction SilentlyContinue
@@ -473,6 +483,8 @@ function Test-KitSignature {
             throw "$leaf : signature numérique invalide ($status). Fichier refusé."
         }
         default {
+            # Sans SHA256 publié (-Required), une signature non vérifiable ne prouve rien : refus
+            if ($Required) { throw "$leaf : signature non vérifiable ($status) et aucune empreinte publiée : fichier refusé." }
             Write-KitLog -Level WARN -Message "$leaf : signature non vérifiable par Authenticode ($status)."
             return "signature non vérifiable ($status)"
         }
