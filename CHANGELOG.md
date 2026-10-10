@@ -18,8 +18,8 @@ la [gestion sémantique de version](https://semver.org/lang/fr/) (`MAJEUR.MINEUR
 
 ### Modifié
 
-- Microsoft 365 en ligne devient un complément (Teams, OneDrive, Office web) ; WinBoat est présenté comme
-  l'alternative pour les autres applications Windows.
+- Version web de Microsoft 365 et Microsoft Edge décochées par défaut (option conservée pour Teams, qui n'existe
+  plus en version de bureau Linux) ; WinBoat présenté comme alternative pour les autres applications Windows.
 - Documentation : la couche Wine/CrossOver ne fait plus fonctionner Microsoft 365 (janvier 2026) ; la voie
   stable est la virtualisation légère.
 

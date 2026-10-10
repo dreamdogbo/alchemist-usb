@@ -16,9 +16,9 @@ familles apt (Ubuntu, Mint, Debian) et dnf (Fedora), dépôts officiels des édi
 | Système | mises à jour, Flatpak + Flathub, pilotes (ubuntu-drivers) et micrologiciels (fwupd), codecs + VLC, réglages GNOME | ● | ● |
 | Polices | compatibles Office : Carlito (Calibri), Caladea (Cambria), Liberation, Microsoft core fonts, Fira Code | ● | ● |
 | Sécurité | pare-feu (ufw / firewalld), ClamAV + ClamTk, KeePassXC, Timeshift | ● | ● |
-| Navigateurs | Google Chrome, Microsoft Edge (Firefox déjà présent) | ● | ● |
+| Navigateurs | Google Chrome (Firefox déjà présent) · Microsoft Edge | ● · ○ | ● · ○ |
 | **Microsoft 365 intégral** | **Word, Excel, PowerPoint, Outlook, OneNote de bureau** via **LinOffice** (Windows léger KVM + FreeRDP, applications dans le menu Linux) | ● | ● |
-| Microsoft 365 en ligne | Teams, OneDrive, Office web (raccourcis Edge) | ● | ● |
+| Raccourcis web (option) | Teams (Microsoft ne publie plus Teams de bureau pour Linux), OneDrive | ○ | ○ |
 | Suites locales | **ONLYOFFICE** (meilleure compatibilité .docx/.xlsx/.pptx) · LibreOffice | ● | ● / ○ |
 | Applications Windows | **WinBoat** : toute application Windows en conteneur (alternative à LinOffice) | ○ | ○ |
 | PDF | **PDFCraft**, Okular, Xournal++, PDF Arranger | ● | ● |
@@ -48,7 +48,9 @@ stable** est la vraie version Windows d'Office dans un **Windows minimal** (dock
   Microsoft 365 active Office 365. Mises à jour : `linoffice.sh update`.
 - **Prérequis** (vérifiés par Alchemist) : virtualisation activée (VT-x/AMD-V), **8 Go de RAM**,
   **64 Go libres**, **licence Microsoft 365** légitime.
-- **Compléments** : Microsoft 365 en ligne (Teams, OneDrive) et ONLYOFFICE pour l'édition rapide hors ligne.
+- **Limites connues de LinOffice** : quelques comportements de fenêtres (Wayland, multi-écrans) ; impression via
+  export PDF ou imprimante réseau configurée dans Windows.
+- **Compléments** : ONLYOFFICE pour l'édition rapide hors ligne ; Teams uniquement en web (option).
 
 ## Windows 11
 

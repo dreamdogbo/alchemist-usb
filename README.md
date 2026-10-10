@@ -42,7 +42,7 @@
 | 🪟 **Windows 11** | ISO officielle (FR, EN, ES, DE, PT), Microsoft 365 hors ligne **ou** LibreOffice / ONLYOFFICE, logiciels, **installation 100 % hors ligne** |
 | 🐧 **Linux** | Ubuntu LTS (recommandé), Linux Mint, Debian, Fedora — stack bureautique ou développeur via les dépôts officiels |
 | 👩‍💻 **Développeurs** | VS Code, Git + GitHub CLI, Docker Engine & Desktop, WSL 2, Python/uv, Node.js LTS, Java, .NET, Go, Rust, Bruno, DBeaver… |
-| 📄 **Microsoft 365 sous Linux** | **version de bureau intégrale** (vrai Word, Excel, PowerPoint, Outlook) via LinOffice, + Teams/OneDrive en ligne et ONLYOFFICE |
+| 📄 **Microsoft 365 sous Linux** | **version de bureau intégrale** (vrai Word, Excel, PowerPoint, Outlook, OneNote) via LinOffice, + ONLYOFFICE |
 | 🎨 **Création** | GIMP, Inkscape, Krita, Kdenlive, OBS… et la suite open source ArtCraft (PhotoCraft, VectorCraft, FilmCraft…) |
 | 🔌 **Clé de A à Z** | installe / met à jour **Ventoy** lui-même (option, garde-fous), puis tout le reste en une fois |
 | 🖥️ **Partout** | crée la clé depuis **Windows** (`Creer-Cle.bat`) ou **Linux** (`creer-cle.sh`) |
@@ -102,7 +102,7 @@ Résumé ci-dessous ; le détail complet est dans **[docs/STACK.md](docs/STACK.m
 | | Bureautique | Développement (en plus) |
 | --- | --- | --- |
 | **Windows** | Microsoft 365 / LibreOffice / ONLYOFFICE, Chrome, Firefox, Acrobat Reader, PDF24, PDFCraft, 7-Zip, VLC, Notepad++, ShareX, Teams, Zoom, Chocolatey + GUI, ClamAV | VS Code, PowerShell 7, PowerToys, Git, GitHub CLI, WSL 2, Docker Desktop, Python, Node.js LTS, Java, .NET SDK, Bruno, DBeaver, KeePassXC |
-| **Linux** | **Microsoft 365 de bureau intégral (LinOffice)**, Teams/OneDrive en ligne, ONLYOFFICE, LibreOffice, Chrome, Edge, PDFCraft, Okular, Zoom, polices Office, ClamAV, pare-feu, Timeshift | VS Code, Git + gh + lazygit, Docker Engine + Desktop, KVM, Python + uv, Node.js LTS, Java, .NET, Go, Rust, Bruno, DBeaver, outils terminal |
+| **Linux** | **Microsoft 365 de bureau intégral (LinOffice)**, ONLYOFFICE, LibreOffice, Chrome, PDFCraft, Okular, Zoom, polices Office, ClamAV, pare-feu, Timeshift | VS Code, Git + gh + lazygit, Docker Engine + Desktop, KVM, Python + uv, Node.js LTS, Java, .NET, Go, Rust, Bruno, DBeaver, outils terminal |
 | **Options** | Création (GIMP, Inkscape, Krita, Kdenlive, OBS…), suite ArtCraft, WinBoat (autres applications Windows), DevOps, JetBrains Toolbox | |
 
 ## Ligne de commande

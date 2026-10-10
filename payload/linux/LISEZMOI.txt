@@ -32,7 +32,7 @@ MICROSOFT 365 SOUS LINUX (version de bureau intégrale)
     dans un Windows léger invisible (LinOffice : Podman + KVM + FreeRDP), lancés depuis le menu.
     Prérequis : virtualisation activée dans le BIOS, 8 Go de RAM, 64 Go libres, licence Microsoft 365.
     Installation automatique (30 à 60 min), puis ouvrir Word et se connecter au compte Microsoft 365.
-  - En complément : Teams / OneDrive en ligne (Edge) et ONLYOFFICE pour l'édition rapide hors ligne.
+  - En complément : ONLYOFFICE (édition rapide hors ligne). Teams n'existe qu'en web (composant optionnel).
 
 EN CAS DE PROBLÈME
   - Journal : /var/log/kit-poste/ (copie dans le dossier personnel).
