@@ -43,4 +43,6 @@
     CompleteNone  = 'Rien ne manque sur la clé, ou pas d''Internet / de kit sur la clé.'
     CompleteAsk   = "Télécharger sur la clé les éléments manquants : {0} ?`n`nSources officielles, mêmes vérifications que lors de la création de la clé."
     CompleteDone  = 'Clé complétée (code {0}). La liste est actualisée.'
+    DrvMaker      = 'Site officiel du fabricant :'
+    DrvSdio       = 'Snappy Driver Installer Origin (depuis la clé, hors ligne)'
 }

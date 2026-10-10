@@ -309,7 +309,25 @@ $btnTool.Add_Click({ $s = @($script:ItemList.SelectedItems); $tag = $null; if ($
 $form.Controls.Add($btnTool)
 $btnDrivers = New-Object System.Windows.Forms.Button
 $btnDrivers.Text = (T 'Drivers'); $btnDrivers.Location = New-Object System.Drawing.Point(672, 414); $btnDrivers.Size = New-Object System.Drawing.Size(180, 32)
-$btnDrivers.Add_Click({ Start-Tool -Entry (@($script:Etat.Items | Where-Object { $_.Name -eq 'SDIO' }) | Select-Object -First 1) })
+# Menu « Pilotes » : page officielle du fabricant détecté, SDIO (clé), composants, Windows Update
+$driverMenu = New-Object System.Windows.Forms.ContextMenuStrip
+$pilotes = Get-Content -LiteralPath (Join-Path $here 'pilotes.json') -Raw -Encoding UTF8 | ConvertFrom-Json
+$maker = [string](Get-CimInstance Win32_ComputerSystem -ErrorAction SilentlyContinue).Manufacturer
+$fab = @($pilotes.Fabricants | Where-Object { $maker -match $_.Motif }) | Select-Object -First 1
+if ($fab) {
+    $mi = $driverMenu.Items.Add(("{0} {1}  ({2})" -f (T 'DrvMaker'), $fab.Nom, $fab.Outil))
+    $mi.Font = New-Object System.Drawing.Font('Segoe UI', 9, [System.Drawing.FontStyle]::Bold)
+    $url = $fab.Url; $mi.Add_Click({ Start-Process $url }.GetNewClosure())
+}
+$sdioItem = $driverMenu.Items.Add((T 'DrvSdio'))
+$sdioItem.Add_Click({ Start-Tool -Entry (@($script:Etat.Items | Where-Object { $_.Name -eq 'SDIO' }) | Select-Object -First 1) })
+$winItem = $driverMenu.Items.Add($pilotes.Windows.Nom)
+$winUrl = $pilotes.Windows.Url; $winItem.Add_Click({ Start-Process $winUrl }.GetNewClosure())
+[void]$driverMenu.Items.Add((New-Object System.Windows.Forms.ToolStripSeparator))
+foreach ($c in @($pilotes.Composants) + @($pilotes.Fabricants | Where-Object { $_ -ne $fab })) {
+    $it = $driverMenu.Items.Add($c.Nom); $u = $c.Url; $it.Add_Click({ Start-Process $u }.GetNewClosure())
+}
+$btnDrivers.Add_Click({ $driverMenu.Show($btnDrivers, 0, $btnDrivers.Height) })
 $form.Controls.Add($btnDrivers)
 $btnLogs = New-Object System.Windows.Forms.Button
 $btnLogs.Text = (T 'Logs'); $btnLogs.Location = New-Object System.Drawing.Point(862, 414); $btnLogs.Size = New-Object System.Drawing.Size(90, 32)

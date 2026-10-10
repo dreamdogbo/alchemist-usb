@@ -43,4 +43,6 @@
     CompleteNone  = 'Nothing missing on the key, or no Internet / no kit on the key.'
     CompleteAsk   = "Download the missing items to the key: {0}?`n`nOfficial sources, same checks as when building the key."
     CompleteDone  = 'Key completed (code {0}). The list is refreshed.'
+    DrvMaker      = 'Official manufacturer site:'
+    DrvSdio       = 'Snappy Driver Installer Origin (from the key, offline)'
 }

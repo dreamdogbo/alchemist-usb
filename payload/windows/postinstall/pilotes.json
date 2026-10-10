@@ -1,0 +1,19 @@
+{
+  "Description": "Liens OFFICIELS vers les pilotes des fabricants (aucun pilote n'est stocké dans le dépôt). Le fabricant du PC est détecté automatiquement (Win32_ComputerSystem.Manufacturer).",
+  "Verifie": "2026-10-10",
+  "Fabricants": [
+    { "Nom": "Dell",      "Motif": "^Dell",                     "Url": "https://www.dell.com/support/home/",                  "Outil": "Dell Command | Update (winget : Dell.CommandUpdate)" },
+    { "Nom": "HP",        "Motif": "^(HP|Hewlett)",             "Url": "https://support.hp.com/fr-fr/drivers",                "Outil": "HP Support Assistant" },
+    { "Nom": "Lenovo",    "Motif": "^LENOVO",                   "Url": "https://pcsupport.lenovo.com/fr/fr/",                 "Outil": "Lenovo System Update / Vantage" },
+    { "Nom": "ASUS",      "Motif": "^ASUS",                     "Url": "https://www.asus.com/fr/support/download-center/",    "Outil": "MyASUS" },
+    { "Nom": "Acer",      "Motif": "^Acer",                     "Url": "https://www.acer.com/fr-fr/support/drivers-and-manuals", "Outil": "Acer Care Center", "Note": "site non joignable depuis le réseau de vérification" },
+    { "Nom": "MSI",       "Motif": "^Micro-Star",               "Url": "https://www.msi.com/support/download",                "Outil": "MSI Center" },
+    { "Nom": "Microsoft Surface", "Motif": "^Microsoft Corporation", "Url": "https://support.microsoft.com/fr-fr/surface/t%C3%A9l%C3%A9charger-des-pilotes-et-microprogrammes-pour-surface-09bb2e09-2a4b-cb69-0951-078a7739e120", "Outil": "Windows Update" }
+  ],
+  "Composants": [
+    { "Nom": "Intel (détection automatique)", "Url": "https://www.intel.com/content/www/us/en/support/detect.html" },
+    { "Nom": "AMD (pilotes graphiques et chipset)", "Url": "https://www.amd.com/fr/support/download/drivers.html" },
+    { "Nom": "NVIDIA (application NVIDIA)", "Url": "https://www.nvidia.com/fr-fr/software/nvidia-app/" }
+  ],
+  "Windows": { "Nom": "Mises à jour facultatives de Windows (pilotes)", "Url": "ms-settings:windowsupdate-optionalupdates" }
+}
