@@ -13,8 +13,11 @@ export PATH="$HOME/.local/bin:$HOME/.cargo/bin:/usr/local/go/bin:$PATH"
 ECHECS=0
 verifier() {
   local nom="$1"; shift
-  local sortie
-  if sortie="$("$@" 2>&1 | head -1)"; then printf '  OK      %-24s %s\n' "$nom" "${sortie:0:70}"
+  local sortie rc
+  # La commande va jusqu'au bout (couper sa sortie l'interromprait) ; on affiche la 1re ligne
+  sortie="$("$@" 2>&1)"; rc=$?
+  sortie="$(printf '%s\n' "$sortie" | grep -m1 -v '^\s*$')"
+  if [ "$rc" -eq 0 ]; then printf '  OK      %-24s %s\n' "$nom" "${sortie:0:70}"
   else printf '  ÉCHEC   %-24s %s\n' "$nom" "${sortie:0:70}"; ECHECS=$((ECHECS + 1)); fi
 }
 paquet() { dpkg-query -W -f='${Version}' "$1" 2>/dev/null || rpm -q --qf '%{VERSION}' "$1" 2>/dev/null; }
@@ -53,7 +56,7 @@ verifier "lazygit" lazygit --version
 
 echo "== Éditeur et conteneurs"
 verifier "VS Code" code --version
-verifier "Docker Engine" sudo docker run --rm hello-world
+verifier "Docker Engine" sh -c 'sudo docker run --rm hello-world | grep -m1 "Hello from Docker"'
 verifier "Docker Compose" docker compose version
 verifier "Docker Desktop" paquet docker-desktop
 verifier "virt-manager" paquet virt-manager
