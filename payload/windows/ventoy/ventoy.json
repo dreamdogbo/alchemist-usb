@@ -1,0 +1,10 @@
+{
+  "auto_install": [
+    {
+      "image": "/ISO/{{ISO_NAME}}",
+      "template": [
+        "/ventoy/script/Windows11_HorsLigne.xml"
+      ]
+    }
+  ]
+}

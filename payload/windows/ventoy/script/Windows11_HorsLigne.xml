@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Windows11_HorsLigne.xml — Fichier de réponse Windows (format officiel Microsoft « unattend »)
+  proposé par Ventoy au démarrage de l'ISO Windows 11 (plugin auto_install).
+
+  Ce qu'il fait :
+   - langue, clavier et formats selon la langue choisie (Build-Kit -Langue) ;
+   - accepte le contrat de licence ;
+   - permet de terminer l'installation SANS Internet avec un COMPTE LOCAL
+     (masque les écrans de compte Microsoft en ligne et de connexion réseau) ;
+   - fuseau horaire du profil.
+
+  Ce qu'il NE fait PAS (volontairement) :
+   - aucun partitionnement / effacement automatique : le technicien choisit le disque ;
+   - aucune clé de produit, aucune activation : l'édition est choisie à l'écran et
+     l'activation se fait normalement (licence numérique / OEM / KMS de l'administration).
+-->
+<unattend xmlns="urn:schemas-microsoft-com:unattend" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State">
+  <settings pass="windowsPE">
+    <component name="Microsoft-Windows-International-Core-WinPE" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+      <SetupUILanguage>
+        <UILanguage>{{UI_LANG}}</UILanguage>
+      </SetupUILanguage>
+      <InputLocale>{{INPUT_LOCALE}}</InputLocale>
+      <SystemLocale>{{UI_LANG}}</SystemLocale>
+      <UILanguage>{{UI_LANG}}</UILanguage>
+      <UserLocale>{{UI_LANG}}</UserLocale>
+    </component>
+    <component name="Microsoft-Windows-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+      <UserData>
+        <AcceptEula>true</AcceptEula>
+      </UserData>
+    </component>
+  </settings>
+  <settings pass="specialize">
+    <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+      <RunSynchronous>
+        <RunSynchronousCommand wcm:action="add">
+          <Order>1</Order>
+          <Description>Autoriser l'installation sans connexion réseau</Description>
+          <Path>reg.exe add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\OOBE" /v BypassNRO /t REG_DWORD /d 1 /f</Path>
+        </RunSynchronousCommand>
+      </RunSynchronous>
+    </component>
+  </settings>
+  <settings pass="oobeSystem">
+    <component name="Microsoft-Windows-International-Core" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+      <InputLocale>{{INPUT_LOCALE}}</InputLocale>
+      <SystemLocale>{{UI_LANG}}</SystemLocale>
+      <UILanguage>{{UI_LANG}}</UILanguage>
+      <UserLocale>{{UI_LANG}}</UserLocale>
+    </component>
+    <component name="Microsoft-Windows-Shell-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+      <TimeZone>{{TIMEZONE}}</TimeZone>
+      <OOBE>
+        <HideEULAPage>true</HideEULAPage>
+        <HideOnlineAccountScreens>true</HideOnlineAccountScreens>
+        <HideWirelessSetupInOOBE>true</HideWirelessSetupInOOBE>
+        <ProtectYourPC>3</ProtectYourPC>
+      </OOBE>
+    </component>
+  </settings>
+</unattend>

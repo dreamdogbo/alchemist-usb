@@ -1,0 +1,52 @@
+﻿==========================================================================
+ CLÉ D'INSTALLATION — POSTE WINDOWS 11 (fonctionne SANS Internet)
+ Kit Ventoy v{{KIT_VERSION}} by dreamdogbo — https://github.com/dreamdogbo/kit-ventoy
+==========================================================================
+
+CONTENU DE LA CLÉ
+  ISO\{{ISO_NAME}}            Windows 11 officiel (64 bits)
+  ISO\Linux\...               Systèmes Linux (si ajoutés à la création)
+  Bureautique\                Microsoft 365 Apps et/ou LibreOffice / ONLYOFFICE
+  Logiciels\                  Navigateurs, PDF, multimédia, utilitaires, outils
+  postinstall\Lancer.bat      Installe les logiciels après Windows (fenêtre)
+  postinstall\Pilotes.bat     Installe les pilotes (Snappy Driver Installer Origin)
+  MANIFEST.sha256             Empreintes de contrôle (ne pas modifier)
+
+ÉTAPE 1 — INSTALLER WINDOWS 11 (ou un autre système)
+  1. Brancher la clé, allumer le PC, ouvrir le menu de démarrage
+     (touche F12, F11, F9, F8 ou Échap selon la marque).
+  2. Choisir la clé USB : le menu Ventoy s'affiche avec tous les systèmes.
+  3. Choisir l'ISO Windows 11, puis le modèle « Windows11_HorsLigne.xml »
+     (recommandé : compte LOCAL sans Internet).
+  4. Clé de produit : saisir la clé fournie, ou « Je n'ai pas de clé de produit »
+     (les PC déjà sous licence s'activent seuls plus tard). Édition PRO conseillée.
+  5. Installation « Personnalisée » : CHOISIR LE BON DISQUE.
+     ATTENTION : supprimer une partition efface définitivement ses données.
+  6. Créer le compte de l'agent. Si un écran exige malgré tout un réseau :
+     Maj+F10, taper  start ms-cxh:localonly  puis Entrée.
+
+ÉTAPE 2 — LOGICIELS ET RÉGLAGES (sur le bureau Windows)
+  1. Ouvrir la clé, dossier postinstall, double-cliquer Lancer.bat, répondre « Oui ».
+  2. La fenêtre montre chaque logiciel : déjà installé / à installer.
+     Cocher ce qu'il faut, indiquer si besoin le nom du poste, cliquer « Installer ».
+  3. Attendre le message de fin (20 à 40 min avec Office). Ne pas retirer la clé.
+  4. Redémarrer le PC.
+  Bouton « Compléter la clé (Internet) » : si un logiciel manque sur la clé et
+  que le PC a Internet, il est téléchargé SUR LA CLÉ pour les prochains postes.
+
+ÉTAPE 3 — PILOTES (si un périphérique ne fonctionne pas)
+  Double-cliquer postinstall\Pilotes.bat (ou bouton « Pilotes » de la fenêtre).
+  Avec Internet : SDIO télécharge ce qu'il faut. Sans Internet : utiliser les
+  packs de pilotes copiés sur la clé (dossier Logiciels\SDIO\app\drivers).
+
+PAS DE LICENCE OFFICE ?
+  Préparer la clé avec LibreOffice ou ONLYOFFICE (gratuits) : dans l'assistant de
+  création, décocher Office365 et cocher l'une des deux suites.
+
+EN CAS DE PROBLÈME
+  - Journaux : C:\PostInstall\ (à transmettre au service informatique).
+  - Une ligne « ÉCHEC » : relancer Lancer.bat (ce qui est fait est sauté).
+  - Activation : licences officielles uniquement (Windows : licence du PC ou
+    KMS/MAK de l'organisation ; Office : compte Microsoft 365 de l'utilisateur).
+
+Ne pas renommer ni déplacer les fichiers de la clé.

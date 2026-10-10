@@ -1,0 +1,36 @@
+﻿==========================================================================
+ INSTALLATION KEY — WINDOWS 11 WORKSTATION (works WITHOUT Internet)
+ Ventoy Kit v{{KIT_VERSION}} by dreamdogbo — https://github.com/dreamdogbo/kit-ventoy
+==========================================================================
+
+KEY CONTENTS
+  ISO\{{ISO_NAME}}            Official Windows 11 (64-bit)
+  ISO\Linux\...               Linux systems (if added when building the key)
+  Bureautique\                Microsoft 365 Apps and/or LibreOffice / ONLYOFFICE
+  Logiciels\                  Browsers, PDF, media, utilities, tools
+  postinstall\Lancer.bat      Installs software after Windows (window)
+  postinstall\Pilotes.bat     Installs drivers (Snappy Driver Installer Origin)
+  MANIFEST.sha256             Integrity hashes (do not edit)
+
+STEP 1 — INSTALL WINDOWS 11 (or another system)
+  1. Plug in the key, power on, open the boot menu (F12, F11, F9, F8 or Esc).
+  2. Choose the USB key: the Ventoy menu lists every system.
+  3. Choose the Windows 11 ISO, then the "Windows11_HorsLigne.xml" template
+     (recommended: LOCAL account without Internet).
+  4. Product key: type it, or "I don't have a product key" (licensed PCs
+     activate later automatically). PRO edition recommended.
+  5. "Custom" install: CHOOSE THE RIGHT DISK. Deleting a partition erases it.
+  6. Create the user account. If a screen still requires a network:
+     Shift+F10, type  start ms-cxh:localonly  then Enter.
+
+STEP 2 — SOFTWARE AND SETTINGS (on the Windows desktop)
+  1. Open the key, folder postinstall, double-click Lancer.bat, answer "Yes".
+  2. The window shows each program: already installed / to install.
+     Check what you need, optionally a computer name, click "Install".
+  3. Wait for the final message (20-40 min with Office). Keep the key plugged in.
+  4. Restart the PC.
+  "Complete the key (Internet)" button: downloads missing programs ONTO THE KEY.
+
+STEP 3 — DRIVERS: double-click postinstall\Pilotes.bat (SDIO).
+
+Activation: official licences only. Logs: C:\PostInstall\
