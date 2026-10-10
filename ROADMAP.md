@@ -29,7 +29,19 @@ L'assistant demande **qui** va utiliser le poste et **pour quoi faire** :
 | Statistiques / données | R + RStudio, Python (Anaconda/Miniforge), Jupyter, JASP, PSPP, QGIS, Power BI Desktop |
 | Graphisme / vidéo | Inkscape, GIMP, Krita, Blender, Kdenlive, DaVinci Resolve, OBS Studio, Audacity, HandBrake |
 
-## v2.0 — Linux de première classe (priorité : bascule Windows → Linux)
+## v2.0 — Outil universel (Windows, Linux, macOS)
+
+Le kit doit pouvoir **créer une clé depuis n'importe quel système** :
+
+- [ ] Moteur commun en **PowerShell 7** (déjà multiplateforme) ; les parties propres à Windows (winget, Fido,
+      WinForms, Authenticode) deviennent des *fournisseurs* interchangeables.
+- [ ] Ventoy : `Ventoy2Disk.exe` sous Windows, `Ventoy2Disk.sh` sous Linux (même logique de garde-fous).
+- [ ] Interface graphique multiplateforme (Avalonia UI ou interface web locale) remplaçant WinForms ;
+      la ligne de commande reste identique partout.
+- [ ] Téléchargements Windows depuis Linux : liens officiels directs (Microsoft, éditeurs, GitHub) quand winget
+      n'est pas disponible.
+
+## v2.x — Linux de première classe (priorité : bascule Windows → Linux)
 
 ### Installation automatisée
 

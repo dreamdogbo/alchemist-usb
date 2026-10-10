@@ -227,7 +227,8 @@ kit-ventoy/
 - [x] **v1.0** : Windows 11 + Office/LibreOffice/ONLYOFFICE + logiciels + pilotes + ClamAV, hors ligne, fenêtres FR/EN, multiboot Linux.
 - [ ] **v1.1** : installer / mettre à jour **Ventoy** depuis l'assistant, puis tout le reste en une seule opération.
 - [ ] **v1.2** : profils par usage (bureautique, développement, statistiques, graphisme/vidéo).
-- [ ] **v2.0** : Linux de première classe (installation automatisée, profil développeur : Docker, VS Code, langages ;
+- [ ] **v2.0** : outil **universel** (créer la clé depuis Windows, Linux ou macOS : moteur PowerShell 7, interface multiplateforme).
+- [ ] **v2.x** : Linux de première classe (installation automatisée, profil développeur : Docker, VS Code, langages ;
       Microsoft 365 sous Linux ; équivalents Adobe : Inkscape, GIMP/Krita, Kdenlive/DaVinci Resolve, PDFCraft).
 - [ ] **v2.1** : assistant de migration Windows → Linux.
 
