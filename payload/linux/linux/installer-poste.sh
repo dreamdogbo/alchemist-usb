@@ -38,8 +38,9 @@ COMPOSANTS=(
   "securite|Pare-feu, antivirus ClamAV + ClamTk, KeePassXC|Sécurité|1|1"
   "sauvegarde|Timeshift (instantanés du système)|Sécurité|1|1"
   "chrome|Google Chrome|Navigateurs|1|1"
-  "edge|Microsoft Edge (requis pour Microsoft 365 en applications)|Navigateurs|1|1"
-  "m365web|Microsoft 365 : Word, Excel, PowerPoint, Outlook, Teams, OneDrive (applications web)|Bureautique|1|1"
+  "edge|Microsoft Edge|Navigateurs|0|0"
+  "office365|Microsoft 365 de bureau INTÉGRAL : Word, Excel, PowerPoint, Outlook, OneNote (LinOffice, Windows léger KVM)|Bureautique|1|1"
+  "m365web|Raccourcis web : Teams (pas de version Linux de bureau), OneDrive (option)|Bureautique|0|0"
   "onlyoffice|ONLYOFFICE Desktop (meilleure compatibilité .docx .xlsx .pptx)|Bureautique|1|1"
   "libreoffice|LibreOffice (français)|Bureautique|1|0"
   "pdf|PDF : PDFCraft, Okular, Xournal++, PDF Arranger|Bureautique|1|1"
@@ -61,7 +62,7 @@ COMPOSANTS=(
   "bdd|DBeaver Community (bases de données)|API et données|0|1"
   "jetbrains|JetBrains Toolbox (IntelliJ, PyCharm, WebStorm…)|Développement|0|0"
   "devops|kubectl, Helm, Terraform, Ansible, AWS CLI, Azure CLI|DevOps|0|0"
-  "winboat|WinBoat : Office de bureau complet via Windows en conteneur (licence requise)|Bureautique|0|0"
+  "winboat|WinBoat : toutes applications Windows dans un conteneur (alternative à LinOffice)|Bureautique|0|0"
   "creation|Création : GIMP, Inkscape, Krita, Kdenlive, OBS Studio, Audacity, HandBrake|Création|0|0"
   "artcraft|Suite ArtCraft : PhotoCraft, VectorCraft, FilmCraft, LightCraft, EffectCraft, DesignCraft|Création|0|0"
 )
@@ -159,6 +160,13 @@ lancer() { if [ "$SIMULATION" -eq 1 ]; then echo "  [simulation] $*"; else "$@";
 en_utilisateur() {
   if [ "$SIMULATION" -eq 1 ]; then echo "  [simulation] ($UTILISATEUR) $*"; return 0; fi
   sudo -u "$UTILISATEUR" -H bash -lc "$*"
+}
+
+# Commande dans la SESSION de l'utilisateur (Podman sans root, D-Bus utilisateur)
+en_session() {
+  if [ "$SIMULATION" -eq 1 ]; then echo "  [simulation] ($UTILISATEUR, session) $*"; return 0; fi
+  local uid; uid="$(id -u "$UTILISATEUR")"
+  sudo -u "$UTILISATEUR" -H env XDG_RUNTIME_DIR="/run/user/$uid" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$uid/bus" bash -lc "$*"
 }
 
 PAQ_A_JOUR=0
@@ -401,13 +409,13 @@ comp_edge() {
 comp_m365web() {
   command -v microsoft-edge >/dev/null 2>&1 || comp_edge
   local apps=(
-    "word|Word (Microsoft 365)|https://www.office.com/launch/word|x-office-document"
-    "excel|Excel (Microsoft 365)|https://www.office.com/launch/excel|x-office-spreadsheet"
-    "powerpoint|PowerPoint (Microsoft 365)|https://www.office.com/launch/powerpoint|x-office-presentation"
-    "outlook|Outlook (Microsoft 365)|https://outlook.office.com/mail/|mail-client"
-    "teams|Teams (Microsoft 365)|https://teams.microsoft.com/|internet-group-chat"
-    "onedrive|OneDrive (Microsoft 365)|https://www.office.com/launch/onedrive|folder-remote"
-    "office|Microsoft 365|https://www.office.com/|applications-office"
+    "teams|Teams|https://teams.microsoft.com/|internet-group-chat"
+    "onedrive|OneDrive|https://www.office.com/launch/onedrive|folder-remote"
+    "office|Microsoft 365 (portail en ligne)|https://www.office.com/|applications-office"
+    "word|Word (en ligne)|https://www.office.com/launch/word|x-office-document"
+    "excel|Excel (en ligne)|https://www.office.com/launch/excel|x-office-spreadsheet"
+    "powerpoint|PowerPoint (en ligne)|https://www.office.com/launch/powerpoint|x-office-presentation"
+    "outlook|Outlook (en ligne)|https://outlook.office.com/mail/|mail-client"
   )
   local a id nom url icone fichier
   for a in "${apps[@]}"; do
@@ -427,6 +435,38 @@ EOF
     chmod 0644 "$fichier"
   done
   echo "  Connectez-vous avec le compte Microsoft 365 de l'utilisateur : fidélité totale des documents."
+}
+
+# Microsoft 365 de bureau INTÉGRAL via LinOffice (github.com/eylenburg/linoffice, AGPL) :
+# Windows minimal (dockur/windows) en conteneur Podman + KVM, applications affichées par FreeRDP
+# comme des applications Linux. Windows et Office viennent directement de Microsoft.
+# Licence Microsoft 365 requise (connexion au compte = Office 365 activé).
+comp_office365() {
+  local ram libre tag
+  if [ "$SIMULATION" -eq 0 ]; then
+    if [ ! -e /dev/kvm ] && ! grep -Eqw 'vmx|svm' /proc/cpuinfo; then
+      jaune "  Virtualisation indisponible : activez Intel VT-x / AMD-V dans le BIOS, puis relancez."; return 1
+    fi
+    ram="$(awk '/MemTotal/ {print int($2/1048576 + 0.5)}' /proc/meminfo)"
+    if [ "$ram" -lt 8 ]; then jaune "  8 Go de RAM minimum requis (ce poste : $ram Go)."; return 1; fi
+    libre="$(df -BG --output=avail "$HOME_UTILISATEUR" | tail -1 | tr -dc '0-9')"
+    if [ "$libre" -lt 64 ]; then jaune "  64 Go libres requis dans $HOME_UTILISATEUR (disponible : $libre Go)."; return 1; fi
+  else
+    echo "  [simulation] vérifications : virtualisation (KVM), 8 Go de RAM, 64 Go libres"
+  fi
+  paquets "podman podman-compose freerdp3-x11 freerdp3-wayland python3 python3-pyside6.qtwidgets python3-pyside6.qtuitools python3-pyside6.qtcore" \
+          "podman podman-compose freerdp python3 python3-pyside6"
+  lancer usermod -aG kvm "$UTILISATEUR"
+  lancer loginctl enable-linger "$UTILISATEUR" || true
+  tag="$(github_tag eylenburg/linoffice)"
+  [ -z "$tag" ] && { jaune "  LinOffice : version introuvable"; return 1; }
+  echo "  LinOffice $tag : installation dans ~/.local/bin/linoffice"
+  en_session "mkdir -p ~/.local/bin && cd ~/.local/bin && if [ -d linoffice ]; then mv linoffice \"linoffice.ancien-\$(date +%s)\"; fi && curl -fsSL https://github.com/eylenburg/linoffice/archive/refs/tags/$tag.tar.gz | tar -xz && mv linoffice-* linoffice && chmod +x linoffice/*.sh"
+  echo "  Téléchargement de Windows et de Microsoft Office depuis Microsoft (plusieurs Go, 30 à 60 min)…"
+  en_session "cd ~/.local/bin/linoffice && ./setup.sh"
+  echo "  Terminé : Word, Excel, PowerPoint, Outlook et OneNote sont dans le menu des applications."
+  echo "  Ouvrez Word et connectez-vous avec le compte Microsoft 365 : Office passe en version 365 activée."
+  echo "  Mises à jour : ~/.local/bin/linoffice/linoffice.sh update — Désinstallation : ~/.local/bin/linoffice/uninstall.sh"
 }
 
 comp_onlyoffice() { flatpak_installer org.onlyoffice.desktopeditors; }

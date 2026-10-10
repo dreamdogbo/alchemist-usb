@@ -7,6 +7,22 @@ la [gestion sémantique de version](https://semver.org/lang/fr/) (`MAJEUR.MINEUR
 
 ## [Non publié]
 
+## [1.3.0] - 2026-10-10
+
+### Ajouté
+
+- **Microsoft 365 de bureau intégral sous Linux** (composant `office365`, coché par défaut) : le vrai Word,
+  Excel, PowerPoint, Outlook et OneNote via **LinOffice** (Windows minimal dockur/windows en conteneur Podman +
+  KVM, affichage FreeRDP, applications dans le menu Linux). Vérification préalable de la virtualisation, de
+  8 Go de RAM et de 64 Go libres ; installation automatique dans la session de l'utilisateur.
+
+### Modifié
+
+- Version web de Microsoft 365 et Microsoft Edge décochées par défaut (option conservée pour Teams, qui n'existe
+  plus en version de bureau Linux) ; WinBoat présenté comme alternative pour les autres applications Windows.
+- Documentation : la couche Wine/CrossOver ne fait plus fonctionner Microsoft 365 (janvier 2026) ; la voie
+  stable est la virtualisation légère.
+
 ## [1.2.0] - 2026-10-10
 
 Le projet devient **Alchemist** (dépôt `dreamdogbo/alchemist-usb`, ancien nom redirigé).
@@ -84,7 +100,8 @@ Première version stable : clé Windows 11 complète, installable hors ligne.
 - Version unique (`VERSION`) affichée dans les fenêtres, les journaux et sur la clé.
 - Intégration continue : PSScriptAnalyzer, syntaxe PowerShell 5.1, lecture des profils et langues.
 
-[Non publié]: https://github.com/dreamdogbo/alchemist-usb/compare/v1.2.0...HEAD
+[Non publié]: https://github.com/dreamdogbo/alchemist-usb/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/dreamdogbo/alchemist-usb/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/dreamdogbo/alchemist-usb/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/dreamdogbo/alchemist-usb/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/dreamdogbo/alchemist-usb/releases/tag/v1.0.0

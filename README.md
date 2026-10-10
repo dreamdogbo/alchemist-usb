@@ -42,7 +42,7 @@
 | 🪟 **Windows 11** | ISO officielle (FR, EN, ES, DE, PT), Microsoft 365 hors ligne **ou** LibreOffice / ONLYOFFICE, logiciels, **installation 100 % hors ligne** |
 | 🐧 **Linux** | Ubuntu LTS (recommandé), Linux Mint, Debian, Fedora — stack bureautique ou développeur via les dépôts officiels |
 | 👩‍💻 **Développeurs** | VS Code, Git + GitHub CLI, Docker Engine & Desktop, WSL 2, Python/uv, Node.js LTS, Java, .NET, Go, Rust, Bruno, DBeaver… |
-| 📄 **Microsoft 365 sous Linux** | applications web intégrées, ONLYOFFICE local, ou Office de bureau complet via WinBoat |
+| 📄 **Microsoft 365 sous Linux** | **version de bureau intégrale** (vrai Word, Excel, PowerPoint, Outlook, OneNote) via LinOffice, + ONLYOFFICE |
 | 🎨 **Création** | GIMP, Inkscape, Krita, Kdenlive, OBS… et la suite open source ArtCraft (PhotoCraft, VectorCraft, FilmCraft…) |
 | 🔌 **Clé de A à Z** | installe / met à jour **Ventoy** lui-même (option, garde-fous), puis tout le reste en une fois |
 | 🖥️ **Partout** | crée la clé depuis **Windows** (`Creer-Cle.bat`) ou **Linux** (`creer-cle.sh`) |
@@ -102,8 +102,8 @@ Résumé ci-dessous ; le détail complet est dans **[docs/STACK.md](docs/STACK.m
 | | Bureautique | Développement (en plus) |
 | --- | --- | --- |
 | **Windows** | Microsoft 365 / LibreOffice / ONLYOFFICE, Chrome, Firefox, Acrobat Reader, PDF24, PDFCraft, 7-Zip, VLC, Notepad++, ShareX, Teams, Zoom, Chocolatey + GUI, ClamAV | VS Code, PowerShell 7, PowerToys, Git, GitHub CLI, WSL 2, Docker Desktop, Python, Node.js LTS, Java, .NET SDK, Bruno, DBeaver, KeePassXC |
-| **Linux** | Microsoft 365 (applications web), ONLYOFFICE, LibreOffice, Chrome, Edge, PDFCraft, Okular, Zoom, polices Office, ClamAV, pare-feu, Timeshift | VS Code, Git + gh + lazygit, Docker Engine + Desktop, KVM, Python + uv, Node.js LTS, Java, .NET, Go, Rust, Bruno, DBeaver, outils terminal |
-| **Options** | Création (GIMP, Inkscape, Krita, Kdenlive, OBS…), suite ArtCraft, WinBoat (Office de bureau sous Linux), DevOps, JetBrains Toolbox | |
+| **Linux** | **Microsoft 365 de bureau intégral (LinOffice)**, ONLYOFFICE, LibreOffice, Chrome, PDFCraft, Okular, Zoom, polices Office, ClamAV, pare-feu, Timeshift | VS Code, Git + gh + lazygit, Docker Engine + Desktop, KVM, Python + uv, Node.js LTS, Java, .NET, Go, Rust, Bruno, DBeaver, outils terminal |
+| **Options** | Création (GIMP, Inkscape, Krita, Kdenlive, OBS…), suite ArtCraft, WinBoat (autres applications Windows), DevOps, JetBrains Toolbox | |
 
 ## Ligne de commande
 
@@ -212,7 +212,7 @@ workstation from a single **Ventoy** USB key. Pick the **system**, the **usage**
 **versions**; Alchemist downloads everything from official sources (latest stable, SHA256-verified), can install
 Ventoy itself, and works from **Windows** (`Creer-Cle.bat`) or **Linux** (`creer-cle.sh`). Windows keys install fully
 **offline**; Linux keys install the stack from official repositories (VS Code, Docker Engine & Desktop, Git/gh,
-Python/uv, Node.js, Java, .NET, Go, Rust, Microsoft 365 web apps, ONLYOFFICE, WinBoat…). See [docs/STACK.md](docs/STACK.md).
+Python/uv, Node.js, Java, .NET, Go, Rust, full desktop Microsoft 365 via LinOffice, ONLYOFFICE…). See [docs/STACK.md](docs/STACK.md).
 No activation tools: legitimate licences only.
 
 ---

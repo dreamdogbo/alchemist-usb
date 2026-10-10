@@ -16,10 +16,11 @@ familles apt (Ubuntu, Mint, Debian) et dnf (Fedora), dépôts officiels des édi
 | Système | mises à jour, Flatpak + Flathub, pilotes (ubuntu-drivers) et micrologiciels (fwupd), codecs + VLC, réglages GNOME | ● | ● |
 | Polices | compatibles Office : Carlito (Calibri), Caladea (Cambria), Liberation, Microsoft core fonts, Fira Code | ● | ● |
 | Sécurité | pare-feu (ufw / firewalld), ClamAV + ClamTk, KeePassXC, Timeshift | ● | ● |
-| Navigateurs | Google Chrome, Microsoft Edge (Firefox déjà présent) | ● | ● |
-| **Microsoft 365** | Word, Excel, PowerPoint, Outlook, Teams, OneDrive en **applications web** (Edge) | ● | ● |
+| Navigateurs | Google Chrome (Firefox déjà présent) · Microsoft Edge | ● · ○ | ● · ○ |
+| **Microsoft 365 intégral** | **Word, Excel, PowerPoint, Outlook, OneNote de bureau** via **LinOffice** (Windows léger KVM + FreeRDP, applications dans le menu Linux) | ● | ● |
+| Raccourcis web (option) | Teams (Microsoft ne publie plus Teams de bureau pour Linux), OneDrive | ○ | ○ |
 | Suites locales | **ONLYOFFICE** (meilleure compatibilité .docx/.xlsx/.pptx) · LibreOffice | ● | ● / ○ |
-| Office de bureau complet | **WinBoat** : Windows en conteneur, Word/Excel/PowerPoint comme des applis Linux (licence requise) | ○ | ○ |
+| Applications Windows | **WinBoat** : toute application Windows en conteneur (alternative à LinOffice) | ○ | ○ |
 | PDF | **PDFCraft**, Okular, Xournal++, PDF Arranger | ● | ● |
 | Communication | Zoom · Slack, Discord | ● · ○ | ● · ○ |
 | Terminal et compilation | build-essential, cmake, gdb, ShellCheck, direnv, ripgrep, fd, fzf, bat, eza, tmux, Neovim, httpie, yq, zsh, tldr | | ● |
@@ -32,13 +33,24 @@ familles apt (Ubuntu, Mint, Debian) et dnf (Fedora), dépôts officiels des édi
 | Création | GIMP, Inkscape, Krita, Kdenlive, OBS Studio, Audacity, HandBrake (DaVinci Resolve : manuel) | ○ | ○ |
 | Suite ArtCraft | PhotoCraft (Photoshop), VectorCraft (Illustrator), FilmCraft (montage), LightCraft (Lightroom), EffectCraft (After Effects), DesignCraft (InDesign) | ○ | ○ |
 
-### Microsoft 365 sous Linux : la bonne approche
+### Microsoft 365 intégral sous Linux : LinOffice
 
-1. **Applications web** (par défaut) : fidélité totale des documents, mises à jour par Microsoft,
-   intégrées au menu comme des applications. Nécessite Internet et un compte Microsoft 365.
-2. **ONLYOFFICE** (par défaut) : édition locale, hors ligne, très compatible avec les formats Office.
-3. **WinBoat** (option) : les applications Office de bureau dans un Windows conteneurisé, pour les cas
-   avancés (macros VBA, compléments). Demande une licence Windows/Office et 8 Go de RAM.
+Microsoft ne publie pas Office pour Linux, et les couches Wine/CrossOver ne font plus fonctionner
+Microsoft 365 (CrossOver le classe « ne démarre pas » depuis janvier 2026). La solution **intégrale et
+stable** est la vraie version Windows d'Office dans un **Windows minimal** (dockur/windows) en conteneur
+**Podman + KVM**, dont les fenêtres sont affichées par **FreeRDP** comme des applications Linux :
+**[LinOffice](https://github.com/eylenburg/linoffice)** (basé sur WinApps).
+
+- **100 % Office** : macros VBA, compléments, mise en page, Outlook, OneNote — c'est le vrai Office.
+- **Intégré** : Word, Excel, PowerPoint, Outlook, OneNote dans le menu ; ouverture des fichiers de
+  `/home` par clic droit ; presse-papier partagé.
+- **Automatique** : Windows et Office sont téléchargés depuis Microsoft ; la connexion au compte
+  Microsoft 365 active Office 365. Mises à jour : `linoffice.sh update`.
+- **Prérequis** (vérifiés par Alchemist) : virtualisation activée (VT-x/AMD-V), **8 Go de RAM**,
+  **64 Go libres**, **licence Microsoft 365** légitime.
+- **Limites connues de LinOffice** : quelques comportements de fenêtres (Wayland, multi-écrans) ; impression via
+  export PDF ou imprimante réseau configurée dans Windows.
+- **Compléments** : ONLYOFFICE pour l'édition rapide hors ligne ; Teams uniquement en web (option).
 
 ## Windows 11
 
