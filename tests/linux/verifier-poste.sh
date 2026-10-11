@@ -58,8 +58,14 @@ echo "== Éditeur et conteneurs"
 verifier "VS Code" code --version
 verifier "Docker Engine" sh -c 'sudo docker run --rm hello-world | grep -m1 "Hello from Docker"'
 verifier "Docker Compose" docker compose version
-verifier "Docker Desktop" paquet docker-desktop
+verifier "Podman Desktop" flatpak info io.podman_desktop.PodmanDesktop
+# Docker Desktop est facultatif (décoché par défaut) : vérifié seulement s'il est installé
+if [ -n "$(paquet docker-desktop)" ]; then verifier "Docker Desktop" paquet docker-desktop; fi
 verifier "virt-manager" paquet virt-manager
+
+echo "== Sécurité des conteneurs"
+verifier "Trivy" trivy --version
+verifier "Trivy (scan d'image)" trivy image --quiet --severity CRITICAL hello-world
 
 echo "== Langages"
 verifier "Python" python3 --version
