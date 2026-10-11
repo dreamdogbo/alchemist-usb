@@ -34,3 +34,20 @@ jobs:
         shell: pwsh
         run: |
           Get-ChildItem config/profils, lang, payload/windows/postinstall/lang -Filter *.psd1 | ForEach-Object { $null = Import-PowerShellDataFile $_.FullName; "OK $($_.Name)" }
+
+  trivy:
+    name: Trivy (secrets et mauvaises configurations)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Trivy fs
+        # Action officielle épinglée par SHA de commit (v0.36.0) : une étiquette peut être déplacée
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: secret,misconfig
+          severity: HIGH,CRITICAL
+          exit-code: '1'
+          version: v0.75.0

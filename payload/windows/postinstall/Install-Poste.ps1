@@ -198,6 +198,17 @@ function Invoke-Installeur {
     #>
     param([Parameter(Mandatory)] [string] $Fichier, [string] $Arguments = '', [string] $Nom = 'installeur', [string] $Dossier)
     $ext = [IO.Path]::GetExtension($Fichier).ToLowerInvariant()
+    if ($ext -eq '.zip') {
+        # Outil en ligne de commande portable (ex. Trivy) : décompressé dans %ProgramFiles%\Alchemist\<nom>,
+        # dossier ajouté au PATH de la machine
+        $cible = Join-Path (Join-Path $env:ProgramFiles 'Alchemist') $Nom
+        Expand-Archive -LiteralPath $Fichier -DestinationPath $cible -Force
+        $path = [Environment]::GetEnvironmentVariable('Path', 'Machine')
+        if (@($path -split ';') -notcontains $cible) {
+            [Environment]::SetEnvironmentVariable('Path', ($path.TrimEnd(';') + ';' + $cible), 'Machine')
+        }
+        return 0
+    }
     if ($ext -eq '.msi') {
         $msiLog = Join-Path $LogDir "$Nom-msi.log"
         $all = ('/i "{0}" {1} /l*v "{2}"' -f $Fichier, $Arguments, $msiLog)
@@ -241,7 +252,7 @@ function Invoke-PostAction {
             return 'configuré ; signatures à télécharger dès qu''Internet sera disponible (freshclam.exe)'
         }
         'WSLFeatures' {
-            # WSL 2 (requis par Docker Desktop) : fonctionnalités Windows, effectives après redémarrage
+            # WSL 2 (requis par Podman et Docker Desktop) : fonctionnalités Windows, effectives après redémarrage
             foreach ($feature in 'Microsoft-Windows-Subsystem-Linux', 'VirtualMachinePlatform') {
                 & dism.exe /Online /Enable-Feature /FeatureName:$feature /All /NoRestart | Out-Null
             }

@@ -34,6 +34,14 @@ MICROSOFT 365 SOUS LINUX (version de bureau intégrale)
     Installation automatique (30 à 60 min), puis ouvrir Word et se connecter au compte Microsoft 365.
   - En complément : ONLYOFFICE (édition rapide hors ligne). Teams n'existe qu'en web (composant optionnel).
 
+CONTENEURS (usage développement)
+  - Docker Engine natif + Podman Desktop (interface graphique) + Trivy (scan de sécurité).
+  - Docker Desktop reste proposé, décoché : payant pour les administrations et les organisations
+    de plus de 250 salariés ou 10 M$ de chiffre d'affaires.
+  - Se déconnecter/reconnecter après l'installation (groupes docker, kvm) : sinon Podman Desktop
+    ne voit pas encore le Docker Engine.
+  - Podman Desktop affiche aussi les conteneurs de LinOffice/WinBoat : ne pas les supprimer.
+
 EN CAS DE PROBLÈME
   - Journal : /var/log/kit-poste/ (copie dans le dossier personnel).
   - Une ligne « ÉCHEC » : relancer (ce qui est fait est sauté).
