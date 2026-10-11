@@ -20,4 +20,10 @@ MICROSOFT 365 ON LINUX (full desktop version)
   lightweight Windows (LinOffice: Podman + KVM + FreeRDP), launched from the Linux menu.
   Requires virtualization enabled, 8 GB RAM, 64 GB free, a Microsoft 365 licence.
 
+CONTAINERS (development usage)
+  Native Docker Engine + Podman Desktop (GUI) + Trivy (security scanner). Docker Desktop is still
+  offered, unchecked (paid licence for public sector and organisations over 250 employees or $10M).
+  Log out and back in after installation (docker, kvm groups). Podman Desktop also shows the
+  LinOffice/WinBoat containers: do not delete them.
+
 Logs: /var/log/kit-poste/ (copy in the home folder).

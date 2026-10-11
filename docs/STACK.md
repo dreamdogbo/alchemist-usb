@@ -26,7 +26,8 @@ familles apt (Ubuntu, Mint, Debian) et dnf (Fedora), dépôts officiels des édi
 | Terminal et compilation | build-essential, cmake, gdb, ShellCheck, direnv, ripgrep, fd, fzf, bat, eza, tmux, Neovim, httpie, yq, zsh, tldr | | ● |
 | Git | Git, Git LFS, **GitHub CLI (gh)**, lazygit, Meld | | ● |
 | Éditeur | **Visual Studio Code** (dépôt Microsoft) · JetBrains Toolbox | | ● · ○ |
-| Conteneurs | **Docker Engine + Compose + Buildx**, **Docker Desktop**, KVM/QEMU + virt-manager | | ● |
+| Conteneurs | **Docker Engine + Compose + Buildx** (natif, rotation des journaux), **Podman Desktop** (interface), KVM/QEMU + virt-manager · Docker Desktop | | ● · ○ |
+| Sécurité des conteneurs | **Trivy** : CVE des images et des dépendances, secrets, mauvaises configurations, SBOM | | ● |
 | Langages | Python 3 + pipx + **uv**, **Node.js LTS** (nvm) + pnpm/yarn (corepack), Java JDK + Maven, .NET SDK, Go, Rust (rustup) | | ● |
 | API et données | **Bruno**, **DBeaver** Community | | ● |
 | DevOps | kubectl, Helm, Terraform, Ansible, AWS CLI, Azure CLI | | ○ |
@@ -52,6 +53,55 @@ stable** est la vraie version Windows d'Office dans un **Windows minimal** (dock
   export PDF ou imprimante réseau configurée dans Windows.
 - **Compléments** : ONLYOFFICE pour l'édition rapide hors ligne ; Teams uniquement en web (option).
 
+### Pourquoi Podman Desktop plutôt que Docker Desktop
+
+Alchemist installe par défaut **Docker Engine natif + Podman Desktop + Trivy** ; Docker Desktop reste
+proposé (décoché).
+
+- **Performances (Linux)** : Docker Desktop ajoute une machine virtuelle (QEMU/KVM) même sous Linux :
+  surcoût de RAM et de CPU, montages de dossiers (*bind mounts*) plus lents, remappage UID/GID, et un
+  contexte `desktop-linux` séparé du moteur `default` (images et conteneurs en double).
+- **Licence** : Docker Desktop est **payant** pour les entités gouvernementales et les organisations de
+  plus de 250 salariés ou de plus de 10 M$ de chiffre d'affaires. Docker Engine reste libre.
+- **Podman Desktop** (Apache 2.0) pilote directement le Docker Engine natif via `/var/run/docker.sock`,
+  ainsi que Podman (conteneurs, images, volumes, Compose, Kubernetes). Sous Windows, il s'appuie sur
+  Podman (machine WSL 2).
+- **Trivy** remplace Docker Scout : vulnérabilités des images et des dépendances, secrets, mauvaises
+  configurations, génération de SBOM.
+
+Points d'attention :
+
+- Les groupes `docker`, `kvm` et `libvirt` ne s'appliquent qu'**après reconnexion** : d'ici là,
+  `docker` sans `sudo` et Podman Desktop n'accèdent pas au moteur.
+- Podman Desktop affiche aussi les conteneurs Podman de **LinOffice** et de **WinBoat** : ne pas les
+  supprimer, sous peine de perdre le Windows qui fait tourner Office.
+- Le moteur Docker reçoit un `/etc/docker/daemon.json` (journaux `json-file` limités à 3 × 10 Mo,
+  `live-restore`) **uniquement s'il n'existe pas** : une configuration locale est conservée.
+
+### Utiliser Trivy
+
+```bash
+trivy image python:3.13-slim                           # vulnérabilités d'une image
+trivy image --severity HIGH,CRITICAL --ignore-unfixed mon-app:latest
+trivy fs .                                             # dépendances et secrets d'un projet
+trivy fs --scanners secret,misconfig .                 # secrets + Dockerfile, Kubernetes, Terraform
+trivy image --format cyclonedx --output sbom.json mon-app:latest   # SBOM
+```
+
+En intégration continue (GitHub Actions), épinglez l'action officielle par SHA de commit :
+
+```yaml
+- uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+  with:
+    scan-type: fs
+    scanners: vuln,secret,misconfig
+    severity: HIGH,CRITICAL
+    exit-code: '1'
+```
+
+La base de vulnérabilités est téléchargée par la post-installation Linux ; sous Windows, elle l'est au
+premier scan (Internet requis).
+
 ## Windows 11
 
 Contenu **hors ligne** sur la clé, installé par `postinstall\Lancer.bat` (fenêtre).
@@ -68,7 +118,8 @@ Contenu **hors ligne** sur la clé, installé par `postinstall\Lancer.bat` (fen�
 | Sécurité | Microsoft Defender (intégré) + **ClamAV** (analyse à la demande) · KeePassXC | ● · | ● |
 | Éditeur et terminal | **VS Code**, PowerShell 7, PowerToys · JetBrains Toolbox | | ● · ○ |
 | Git | **Git**, **GitHub CLI** · GitHub Desktop | | ● · ○ |
-| Conteneurs | **WSL 2**, **Docker Desktop** | | ● |
+| Conteneurs | **WSL 2**, **Podman** + **Podman Desktop** · Docker Desktop | | ● · ○ |
+| Sécurité des conteneurs | **Trivy** (ajouté au PATH) | | ● |
 | Langages | **Python**, **Node.js LTS**, Java (Temurin 25), .NET SDK 10 · Go, Rust | | ● · ○ |
 | API et données | **Bruno**, **DBeaver** · Postman | | ● · ○ |
 | Création | GIMP, Inkscape, Krita, Kdenlive, OBS Studio, Audacity · Suite ArtCraft | ○ | ● (GIMP, Inkscape) · ○ |

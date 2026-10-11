@@ -7,6 +7,32 @@ la [gestion sémantique de version](https://semver.org/lang/fr/) (`MAJEUR.MINEUR
 
 ## [Non publié]
 
+### Ajouté
+
+- **Podman Desktop** (Apache 2.0) : interface graphique qui pilote le Docker Engine natif (`/var/run/docker.sock`)
+  et Podman. Linux : composant `podmandesktop` (Flathub), coché pour le développement. Windows : éléments
+  `Podman` (moteur, machine WSL 2) et `PodmanDesktop`.
+- **Trivy** (Aqua Security) : scan des vulnérabilités des images et des dépendances, des secrets et des mauvaises
+  configurations, SBOM. Linux : composant `trivy` (dépôt officiel, base pré-téléchargée). Windows : élément
+  `Trivy` (archive portable installée dans `%ProgramFiles%\Alchemist\Trivy` et ajoutée au PATH).
+- Post-installation Windows : prise en charge des outils en ligne de commande livrés en archive zip.
+- Docker Engine : rotation des journaux des conteneurs (`/etc/docker/daemon.json` : `json-file`, 3 × 10 Mo,
+  `live-restore`), écrit seulement s'il n'existe pas.
+- CI : analyse Trivy du dépôt (secrets, mauvaises configurations), action officielle épinglée par SHA.
+- Documentation : « Pourquoi Podman Desktop plutôt que Docker Desktop » et « Utiliser Trivy » (docs/STACK.md).
+
+### Modifié
+
+- **Docker Desktop décoché par défaut**, sous Linux comme sous Windows : machine virtuelle supplémentaire sous
+  Linux, licence payante pour les administrations et les organisations de plus de 250 salariés ou 10 M$ de
+  chiffre d'affaires. Il reste proposé en option.
+- Test réel Linux : `podmandesktop` et `trivy` remplacent `dockerdesktop` ; le vérificateur contrôle Podman
+  Desktop et Trivy, et Docker Desktop seulement s'il est installé.
+
+### Corrigé
+
+- Aide de `installer-poste.sh` : la ligne `set -Eeuo pipefail` n'apparaît plus dans `--aide`.
+
 ## [1.3.1] - 2026-10-10
 
 ### Ajouté
