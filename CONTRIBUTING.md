@@ -60,6 +60,8 @@ Exemple : `feat(profil): ajouter le profil développement`.
 8. Scripts Linux : `shellcheck -S warning` sans remarque ; la simulation multi-distributions tourne dans
    GitHub Actions (`tests-linux.yml`) — inutile de télécharger des images Docker sur votre poste.
 9. Composant Linux : prévoir les deux familles (`paquets "noms apt" "noms dnf"`).
+10. GitHub Actions : épingler chaque action par **SHA de commit complet**, version en commentaire
+    (`uses: owner/action@<sha> # vX.Y.Z`) ; une étiquette peut être déplacée vers un code malveillant.
 
 ## Ajouter un logiciel
 

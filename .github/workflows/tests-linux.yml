@@ -10,7 +10,7 @@ jobs:
     name: Scripts et moteur sous Linux
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
       - name: shellcheck
         run: shellcheck -S warning payload/linux/linux/*.sh creer-cle.sh tests/linux/*.sh
@@ -55,7 +55,7 @@ jobs:
         run: |
           if command -v apt-get >/dev/null; then apt-get update -qq && apt-get install -y -qq curl python3 sudo ca-certificates git
           else dnf install -y -q curl python3 sudo git; fi
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
       - name: Stack développement (simulation, rien n'est installé)
         run: |
           useradd -m testeur

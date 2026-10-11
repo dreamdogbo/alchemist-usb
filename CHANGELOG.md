@@ -7,6 +7,11 @@ la [gestion sémantique de version](https://semver.org/lang/fr/) (`MAJEUR.MINEUR
 
 ## [Non publié]
 
+### Modifié
+
+- CI : toutes les actions GitHub sont épinglées par SHA de commit (`actions/checkout` v5.1.0,
+  `actions/upload-artifact` v4.6.2) ; règle ajoutée à CONTRIBUTING.md.
+
 ## [1.4.0] - 2026-10-11
 
 ### Ajouté
