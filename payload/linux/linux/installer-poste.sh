@@ -5,13 +5,14 @@
 #
 #  Distributions : Ubuntu LTS, Linux Mint, Debian (famille apt) et Fedora (famille dnf).
 #  Installe la stack depuis les dépôts OFFICIELS (distribution, Microsoft, Google, Docker,
-#  GitHub, HashiCorp, Flathub, éditeurs). Idempotent : ce qui est déjà installé est sauté.
+#  Aqua Security, GitHub, HashiCorp, Flathub, éditeurs). Idempotent : ce qui est déjà installé est sauté.
+#  Conteneurs : Docker Engine natif + Podman Desktop (interface) + Trivy (scan) ; Docker Desktop en option.
 #  Journal : /var/log/kit-poste/ (copie dans le dossier personnel).
 #
 #  Usage :
 #    sudo bash installer-poste.sh                      # menu (cases à cocher)
 #    sudo bash installer-poste.sh -u developpement -y  # stack développement, sans questions
-#    sudo bash installer-poste.sh -c vscode,docker -y  # composants précis
+#    sudo bash installer-poste.sh -c vscode,docker,podmandesktop,trivy -y  # composants précis
 #    bash installer-poste.sh --liste                   # liste des composants
 #    bash installer-poste.sh -u developpement -n -y    # simulation (rien n'est installé)
 # =============================================================================
@@ -50,7 +51,9 @@ COMPOSANTS=(
   "git|Git, Git LFS, GitHub CLI (gh), lazygit, Meld|Développement|0|1"
   "vscode|Visual Studio Code (dépôt Microsoft)|Développement|0|1"
   "docker|Docker Engine + Compose + Buildx (dépôt Docker)|Conteneurs|0|1"
-  "dockerdesktop|Docker Desktop for Linux|Conteneurs|0|1"
+  "podmandesktop|Podman Desktop (interface graphique pour Docker Engine et Podman)|Conteneurs|0|1"
+  "trivy|Trivy : scan de vulnérabilités des images, dépendances et secrets|Sécurité|0|1"
+  "dockerdesktop|Docker Desktop for Linux (licence payante en entreprise/administration)|Conteneurs|0|0"
   "virtualisation|Virtualisation KVM / QEMU + virt-manager|Conteneurs|0|1"
   "python|Python 3, pipx, uv|Langages|0|1"
   "node|Node.js LTS (nvm) + corepack (pnpm, yarn)|Langages|0|1"
@@ -547,6 +550,21 @@ comp_docker() {
           "docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin"
   lancer usermod -aG docker "$UTILISATEUR"
   lancer systemctl enable --now docker || true
+  # Rotation des journaux des conteneurs ; un daemon.json existant (réglages locaux) est conservé
+  if [ -f /etc/docker/daemon.json ]; then echo "  /etc/docker/daemon.json existant : conservé"; return 0; fi
+  if [ "$SIMULATION" -eq 1 ]; then
+    echo "  [simulation] /etc/docker/daemon.json : journaux json-file (10 Mo x 3), live-restore"
+  else
+    install -d -m 0755 /etc/docker
+    cat > /etc/docker/daemon.json <<'EOF'
+{
+  "log-driver": "json-file",
+  "log-opts": { "max-size": "10m", "max-file": "3" },
+  "live-restore": true
+}
+EOF
+  fi
+  lancer systemctl restart docker || true
 }
 
 comp_virtualisation() {
@@ -557,6 +575,35 @@ comp_virtualisation() {
   lancer systemctl enable --now libvirtd || true
 }
 
+# Podman Desktop (Flathub, Apache 2.0) : pilote le Docker Engine natif (/var/run/docker.sock) et Podman
+comp_podmandesktop() {
+  command -v flatpak >/dev/null 2>&1 || comp_flatpak
+  paq_present docker-ce || comp_docker
+  flatpak_installer io.podman_desktop.PodmanDesktop
+  # Accès au socket Docker, limité à Podman Desktop (déjà prévu par Flathub, réaffirmé ici)
+  lancer flatpak override --system --filesystem=/run/docker.sock --filesystem=/var/run/docker.sock io.podman_desktop.PodmanDesktop
+  echo "  Podman Desktop voit aussi les conteneurs LinOffice/WinBoat : ne pas les supprimer."
+}
+
+# Trivy (dépôt officiel Aqua Security) : CVE des images et dépendances, secrets, mauvaises configurations, SBOM
+comp_trivy() {
+  if [ "$FAMILLE" = "deb" ]; then
+    depot_apt trivy https://aquasecurity.github.io/trivy-repo/deb/public.key \
+      "deb [signed-by=@CLE@] https://aquasecurity.github.io/trivy-repo/deb generic main"
+  else
+    # shellcheck disable=SC2016
+    depot_rpm trivy '[trivy]
+name=Trivy repository
+baseurl=https://aquasecurity.github.io/trivy-repo/rpm/releases/$basearch/
+gpgcheck=1
+enabled=1
+gpgkey=https://aquasecurity.github.io/trivy-repo/rpm/public.key'
+  fi
+  paquets "trivy" "trivy"
+  # Base de vulnérabilités dans le cache de l'utilisateur (non bloquant : téléchargée au premier scan sinon)
+  en_utilisateur "trivy image --download-db-only --quiet" || jaune "  base Trivy non téléchargée : elle le sera au premier scan"
+}
+
 comp_dockerdesktop() {
   paq_present docker-ce-cli || comp_docker
   comp_virtualisation
@@ -564,6 +611,8 @@ comp_dockerdesktop() {
   if [ "$FAMILLE" = "deb" ]; then fichier_paquet docker-desktop https://desktop.docker.com/linux/main/amd64/docker-desktop-amd64.deb docker-desktop
   else fichier_paquet docker-desktop https://desktop.docker.com/linux/main/amd64/docker-desktop-x86_64.rpm docker-desktop; fi
   echo "  Docker Desktop et Docker Engine cohabitent : « docker context use desktop-linux » / « default »."
+  echo "  Licence : Docker Desktop est payant pour les administrations et les organisations de plus de"
+  echo "  250 salariés ou 10 M\$ de chiffre d'affaires (Docker Engine reste libre). Alternative : podmandesktop."
 }
 
 comp_python() {
@@ -748,7 +797,8 @@ etape "BILAN"
 printf '%s\n' "${BILAN[@]}"
 if [ "$SIMULATION" -eq 0 ]; then
   cp "$JOURNAL" "$HOME_UTILISATEUR/" 2>/dev/null && chown "$UTILISATEUR": "$HOME_UTILISATEUR/$(basename "$JOURNAL")" || true
-  echo "Redémarrez (ou déconnectez-vous) pour appliquer les groupes docker / kvm et les chemins."
+  echo "Redémarrez (ou déconnectez-vous) pour appliquer les groupes docker / kvm / libvirt et les chemins :"
+  echo "d'ici là, « docker » sans sudo et Podman Desktop n'accèdent pas au Docker Engine."
 fi
 if [ "$ECHECS" -eq 0 ]; then vert "Terminé sans échec."; else rouge "$ECHECS échec(s) : relancez le script (ce qui est fait est sauté)."; fi
 exit "$ECHECS"
