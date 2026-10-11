@@ -159,10 +159,12 @@ etape() { printf '\n\033[36m== %s\033[0m\n' "$*"; }
 # Exécute une commande, ou l'affiche seulement en simulation
 lancer() { if [ "$SIMULATION" -eq 1 ]; then echo "  [simulation] $*"; else "$@"; fi; }
 
-# Commande exécutée en tant qu'utilisateur (outils installés dans le dossier personnel)
+# Commande exécutée en tant qu'utilisateur (outils installés dans le dossier personnel).
+# Elle part du dossier personnel : le dossier courant (celui de root, ex. /root ou le dépôt
+# cloné) peut être inaccessible à l'utilisateur, ce qui fait échouer Podman, nvm, rustup…
 en_utilisateur() {
   if [ "$SIMULATION" -eq 1 ]; then echo "  [simulation] ($UTILISATEUR) $*"; return 0; fi
-  sudo -u "$UTILISATEUR" -H bash -lc "$*"
+  sudo -u "$UTILISATEUR" -H bash -lc "cd ~ || exit; $*"
 }
 
 # Commande dans la SESSION de l'utilisateur (Podman sans root, D-Bus utilisateur)
@@ -176,7 +178,7 @@ en_session() {
   [ -n "${XAUTHORITY:-}" ] && ecran+=("XAUTHORITY=$XAUTHORITY")
   # Dossiers propres à l'utilisateur (aucune configuration héritée d'un autre compte)
   sudo -u "$UTILISATEUR" -H env -u XDG_CONFIG_HOME -u XDG_DATA_HOME -u XDG_CACHE_HOME -u CONTAINERS_CONF -u CONTAINERS_STORAGE_CONF \
-    HOME="$HOME_UTILISATEUR" XDG_RUNTIME_DIR="/run/user/$uid" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$uid/bus" "${ecran[@]}" bash -lc "$*"
+    HOME="$HOME_UTILISATEUR" XDG_RUNTIME_DIR="/run/user/$uid" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$uid/bus" "${ecran[@]}" bash -lc "cd ~ || exit; $*"
 }
 
 PAQ_A_JOUR=0
