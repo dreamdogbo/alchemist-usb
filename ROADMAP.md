@@ -14,8 +14,12 @@ Versions : [SemVer](https://semver.org/lang/fr/). Avancement réel : [CHANGELOG]
 - [x] **v1.2** — Alchemist : parcours Système → Usage → Versions, profils hérités, stack développeur Windows,
       post-installation Linux multi-distributions (Ubuntu, Mint, Debian, Fedora), Microsoft 365 sous Linux,
       création (GIMP, Inkscape, Krita, Kdenlive, ArtCraft…), moteur et assistant sous Linux, tests Linux en CI.
+- [x] **v1.3** — Microsoft 365 de bureau intégral sous Linux (LinOffice : Windows minimal, Podman sans root, KVM),
+      installation réelle de la stack Linux et d'Office 365 testée sur GitHub Actions.
+- [x] **v1.4** — Conteneurs sans licence payante : Docker Engine natif + Podman Desktop + Trivy à la place de
+      Docker Desktop (Linux et Windows), rotation des journaux Docker, analyse Trivy du dépôt en CI.
 
-## v1.3 — Linux sans effort
+## v1.5 — Linux sans effort
 
 - [ ] **Installation Linux automatisée** depuis le menu Ventoy : Ubuntu *autoinstall* (cloud-init), Fedora
       *kickstart*, Debian *preseed* — langue, clavier, compte, usage pré-réglés.
@@ -23,7 +27,7 @@ Versions : [SemVer](https://semver.org/lang/fr/). Avancement réel : [CHANGELOG]
 - [ ] **Paquets Linux hors ligne** sur la clé (.deb / .rpm / Flatpak bundles) pour les postes sans Internet.
 - [ ] Noms lisibles dans le menu Ventoy (`menu_alias`) et persistance pour les systèmes « live ».
 
-## v1.4 — Nouveaux usages
+## v1.6 — Nouveaux usages
 
 | Usage | Contenu envisagé |
 | --- | --- |
