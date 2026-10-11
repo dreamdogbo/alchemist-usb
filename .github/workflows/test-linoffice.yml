@@ -43,12 +43,12 @@ jobs:
         run: |
           grep testeur /etc/subuid /etc/subgid || true
           ls -ld /run/user/$(id -u testeur) || true
-          sudo -u testeur -H env XDG_RUNTIME_DIR="/run/user/$(id -u testeur)" bash -lc 'podman info 2>&1 | tail -n 25' || true
+          sudo -u testeur -H env XDG_RUNTIME_DIR="/run/user/$(id -u testeur)" bash -lc 'cd ~ && podman info 2>&1 | tail -n 25' || true
           sysctl kernel.apparmor_restrict_unprivileged_userns kernel.unprivileged_userns_clone 2>/dev/null || true
 
       - name: Diagnostic LinOffice
         if: always()
-        run: sudo -u testeur -H env XDG_RUNTIME_DIR="/run/user/$(id -u testeur)" DISPLAY=:99 bash -lc '~/.local/bin/linoffice/setup.sh --healthcheck'
+        run: sudo -u testeur -H env XDG_RUNTIME_DIR="/run/user/$(id -u testeur)" DISPLAY=:99 bash -lc 'cd ~ && ~/.local/bin/linoffice/setup.sh --healthcheck'
 
       - name: Ouvrir Word, Excel et PowerPoint, captures d'écran
         if: success()
@@ -56,7 +56,7 @@ jobs:
           mkdir -p captures
           for app in word excel powerpoint; do
             sudo -u testeur -H env XDG_RUNTIME_DIR="/run/user/$(id -u testeur)" DISPLAY=:99 \
-              bash -lc "nohup ~/.local/bin/linoffice/linoffice.sh $app >/tmp/$app.log 2>&1 &"
+              bash -lc "cd ~ && nohup ~/.local/bin/linoffice/linoffice.sh $app >/tmp/$app.log 2>&1 &"
             sleep 120
             DISPLAY=:99 import -window root "captures/$app.png" || true
             DISPLAY=:99 xwininfo -root -tree | grep -iE 'word|excel|powerpoint|freerdp' | head -5 || true
