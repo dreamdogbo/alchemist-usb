@@ -9,7 +9,7 @@
     Nom         = 'Windows 11 — Développement'
     Usage       = 'Developpement'
     Ordre       = 2
-    Description = 'Bureautique + VS Code, Git/GitHub, WSL 2, Docker Desktop, Python, Node.js, Java, .NET, Go, outils API et bases de données'
+    Description = 'Bureautique + VS Code, Git/GitHub, WSL 2, Podman Desktop, Trivy, Python, Node.js, Java, .NET, Go, outils API et bases de données'
 
     # La création graphique est souvent utile aux développeurs front : proposée cochée
     ParDefaut   = @('Inkscape', 'GIMP')
@@ -42,10 +42,25 @@
            Repo = 'microsoft/WSL'; AssetPattern = '^wsl\.[\d.]+\.x64\.msi$'; EstimatedSizeMB = 360; Signer = 'Microsoft Corporation'
            SilentArgs = '/qn /norestart'; SuccessCodes = @(0, 3010, 1641); Detection = 'reg:^Windows Subsystem for Linux'; Order = 105
            PostAction = 'WSLFeatures' }
-        @{ Name = 'DockerDesktop'; Category = 'Conteneurs'; Type = 'Winget'; Priority = 4; TargetDir = 'Logiciels/DockerDesktop'
+        # Docker Desktop : payant pour les administrations et les organisations > 250 salariés ou > 10 M$ de CA
+        @{ Name = 'DockerDesktop'; Category = 'Conteneurs'; Type = 'Winget'; Priority = 6; Default = $false; TargetDir = 'Logiciels/DockerDesktop'
            WingetId = 'Docker.DockerDesktop'; Architecture = 'x64'; EstimatedSizeMB = 650; Signer = 'Docker'
            SilentArgs = 'install --quiet --accept-license --backend=wsl-2 --always-run-service'; SuccessCodes = @(0, 3010)
            Detection = 'reg:^Docker Desktop'; Order = 106 }
+        # Podman (moteur, machine WSL 2) + Podman Desktop (interface, Apache 2.0) : alternative libre à Docker Desktop.
+        # WSLCheckbox=0 : les fonctionnalités WSL 2 sont activées par l'élément WSL (PostAction WSLFeatures).
+        @{ Name = 'Podman'; Category = 'Conteneurs'; Type = 'Winget'; Priority = 4; TargetDir = 'Logiciels/Podman'
+           WingetId = 'RedHat.Podman'; Architecture = 'x64'; InstallerType = 'burn'; Scope = 'machine'; EstimatedSizeMB = 30; Signer = ''
+           SilentArgs = '/install /quiet /norestart WSLCheckbox=0'; SuccessCodes = @(0, 3010, 1641)
+           Detection = 'reg:^Podman( CLI|\s+\d|$)'; Order = 107 }
+        @{ Name = 'PodmanDesktop'; Category = 'Conteneurs'; Type = 'Winget'; Priority = 4; TargetDir = 'Logiciels/PodmanDesktop'
+           WingetId = 'RedHat.Podman-Desktop'; Architecture = 'x64'; InstallerType = 'nullsoft'; Scope = 'machine'; EstimatedSizeMB = 145; Signer = ''
+           SilentArgs = '/S'; SuccessCodes = @(0); Detection = 'reg:^Podman Desktop'; Order = 108 }
+        # Trivy (Aqua Security, Apache 2.0) : CVE des images et dépendances, secrets, mauvaises configurations, SBOM.
+        # Archive zip portable : décompressée dans %ProgramFiles%\Alchemist\Trivy et ajoutée au PATH.
+        @{ Name = 'Trivy'; Category = 'Sécurité'; Type = 'Winget'; Priority = 4; TargetDir = 'Logiciels/Trivy'
+           WingetId = 'AquaSecurity.Trivy'; Architecture = 'x64'; InstallerType = 'zip'; EstimatedSizeMB = 50; Signer = ''
+           SilentArgs = ''; SuccessCodes = @(0); Detection = 'file:%ProgramFiles%\Alchemist\Trivy\trivy.exe'; Order = 109 }
 
         # ================================================================== Langages
         @{ Name = 'Python'; Category = 'Langages'; Type = 'Winget'; Priority = 3; TargetDir = 'Logiciels/Python'
