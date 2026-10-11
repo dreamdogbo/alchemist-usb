@@ -7,6 +7,8 @@ la [gestion sémantique de version](https://semver.org/lang/fr/) (`MAJEUR.MINEUR
 
 ## [Non publié]
 
+## [1.4.1] - 2026-10-11
+
 ### Modifié
 
 - CI : toutes les actions GitHub sont épinglées par SHA de commit (`actions/checkout` v5.1.0,
@@ -17,6 +19,9 @@ la [gestion sémantique de version](https://semver.org/lang/fr/) (`MAJEUR.MINEUR
 - Linux : les commandes lancées pour l'utilisateur (Podman sans root de LinOffice, nvm, rustup, uv, Trivy)
   partent de son dossier personnel ; lancé depuis un dossier inaccessible à l'utilisateur (ex. /root),
   Microsoft 365 intégral échouait sur « cannot chdir … Permission denied ».
+- Test Office 365 intégral (`test-linoffice.yml`) : réussit désormais de bout en bout (installation de Windows
+  et d'Office, diagnostic, captures de Word, Excel et PowerPoint) ; ses étapes s'exécutent dans le dossier et
+  avec la configuration de l'utilisateur de test.
 
 ## [1.4.0] - 2026-10-11
 
@@ -153,7 +158,8 @@ Première version stable : clé Windows 11 complète, installable hors ligne.
 - Version unique (`VERSION`) affichée dans les fenêtres, les journaux et sur la clé.
 - Intégration continue : PSScriptAnalyzer, syntaxe PowerShell 5.1, lecture des profils et langues.
 
-[Non publié]: https://github.com/dreamdogbo/alchemist-usb/compare/v1.4.0...HEAD
+[Non publié]: https://github.com/dreamdogbo/alchemist-usb/compare/v1.4.1...HEAD
+[1.4.1]: https://github.com/dreamdogbo/alchemist-usb/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/dreamdogbo/alchemist-usb/compare/v1.3.1...v1.4.0
 [1.3.1]: https://github.com/dreamdogbo/alchemist-usb/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/dreamdogbo/alchemist-usb/compare/v1.2.0...v1.3.0
