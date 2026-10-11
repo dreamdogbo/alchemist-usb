@@ -62,6 +62,8 @@ Exemple : `feat(profil): ajouter le profil développement`.
 9. Composant Linux : prévoir les deux familles (`paquets "noms apt" "noms dnf"`).
 10. GitHub Actions : épingler chaque action par **SHA de commit complet**, version en commentaire
     (`uses: owner/action@<sha> # vX.Y.Z`) ; une étiquette peut être déplacée vers un code malveillant.
+    Dependabot (`.github/dependabot.yml`) propose chaque lundi une PR groupée avec les nouveaux SHA :
+    vérifier les notes de version des actions avant de la fusionner.
 
 ## Ajouter un logiciel
 
