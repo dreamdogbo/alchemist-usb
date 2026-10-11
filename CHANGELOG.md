@@ -12,6 +12,12 @@ la [gestion sémantique de version](https://semver.org/lang/fr/) (`MAJEUR.MINEUR
 - CI : toutes les actions GitHub sont épinglées par SHA de commit (`actions/checkout` v5.1.0,
   `actions/upload-artifact` v4.6.2) ; règle ajoutée à CONTRIBUTING.md.
 
+### Corrigé
+
+- Linux : les commandes lancées pour l'utilisateur (Podman sans root de LinOffice, nvm, rustup, uv, Trivy)
+  partent de son dossier personnel ; lancé depuis un dossier inaccessible à l'utilisateur (ex. /root),
+  Microsoft 365 intégral échouait sur « cannot chdir … Permission denied ».
+
 ## [1.4.0] - 2026-10-11
 
 ### Ajouté
