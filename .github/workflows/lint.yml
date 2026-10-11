@@ -8,7 +8,7 @@ jobs:
   lint:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
       - name: PSScriptAnalyzer
         shell: pwsh
@@ -39,7 +39,7 @@ jobs:
     name: Trivy (secrets et mauvaises configurations)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
       - name: Trivy fs
         # Action officielle épinglée par SHA de commit (v0.36.0) : une étiquette peut être déplacée
