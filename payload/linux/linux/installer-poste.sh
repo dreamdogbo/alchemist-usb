@@ -69,7 +69,7 @@ COMPOSANTS=(
 
 # ----------------------------------------------------------------------------- aide et options
 aide() {
-  sed -n '2,19p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+  awk 'NR > 1 && !/^#/ { exit } NR > 1' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
   cat <<'EOF'
 Options :
   -u, --usage bureautique|developpement   stack par défaut (sinon : kit.conf de la clé)
