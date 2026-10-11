@@ -7,6 +7,10 @@ la [gestion sémantique de version](https://semver.org/lang/fr/) (`MAJEUR.MINEUR
 
 ## [Non publié]
 
+### Ajouté
+
+- CI : Dependabot met à jour chaque semaine les actions GitHub épinglées par SHA (une PR groupée, préfixe `ci`).
+
 ## [1.4.1] - 2026-10-11
 
 ### Modifié

@@ -1,0 +1,18 @@
+# Mises à jour des actions GitHub (épinglées par SHA de commit, version en commentaire) :
+# Dependabot propose chaque semaine une seule PR regroupant les nouveaux SHA.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: Africa/Abidjan
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: ci
+    groups:
+      actions:
+        patterns:
+          - '*'
