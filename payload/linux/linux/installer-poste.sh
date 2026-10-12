@@ -844,9 +844,29 @@ done
 # ----------------------------------------------------------------------------- exécution
 etape "Alchemist v$KIT_VERSION — ${PRETTY_NAME:-$DISTRO} (famille $FAMILLE, dépôts $UPSTREAM/$CODENAME) — usage : $USAGE_CHOISI$([ "$SIMULATION" -eq 1 ] && echo ' — SIMULATION')"
 echo "Utilisateur : $UTILISATEUR — journal : $JOURNAL"
-if [ "$SIMULATION" -eq 0 ] && ! curl -fsI https://flathub.org >/dev/null 2>&1; then
-  rouge "Pas d'accès à Internet : la post-installation Linux utilise les dépôts officiels en ligne."
-  exit 3
+if [ "$SIMULATION" -eq 0 ]; then
+  # Outils indispensables au script, absents d'une installation de bureau minimale (curl : Ubuntu, Debian)
+  manquants=()
+  for outil in curl python3 gpg; do command -v "$outil" >/dev/null 2>&1 || manquants+=("$outil"); done
+  if [ "${#manquants[@]}" -gt 0 ]; then
+    echo "Installation des outils nécessaires : ${manquants[*]}"
+    if [ "$FAMILLE" = "deb" ]; then
+      apt-get update -qq && apt-get install -y -qq curl ca-certificates python3 gnupg >/dev/null
+    else dnf install -y -q curl ca-certificates python3 gnupg2 >/dev/null; fi || true
+  fi
+  # Accès aux dépôts : toute réponse HTTP prouve la connexion (le code de retour du site importe peu)
+  erreur_reseau=""
+  for url in https://flathub.org https://github.com https://deb.debian.org; do
+    if erreur_reseau="$(curl -sS -o /dev/null --max-time 15 "$url" 2>&1)"; then erreur_reseau=""; break; fi
+  done
+  if ! command -v curl >/dev/null 2>&1 || [ -n "$erreur_reseau" ]; then
+    rouge "Pas d'accès à Internet : la post-installation Linux utilise les dépôts officiels en ligne."
+    [ -n "$erreur_reseau" ] && rouge "  Détail : $erreur_reseau"
+    command -v curl >/dev/null 2>&1 || rouge "  curl n'a pas pu être installé : vérifiez la connexion, puis « sudo apt install curl »."
+    exit 3
+  fi
+elif ! command -v curl >/dev/null 2>&1; then
+  jaune "curl absent : simulation partielle (il sera installé automatiquement lors de l'installation réelle)."
 fi
 
 declare -a BILAN=()

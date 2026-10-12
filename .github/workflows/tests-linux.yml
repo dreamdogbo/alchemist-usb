@@ -62,3 +62,23 @@ jobs:
           SUDO_USER=testeur bash payload/linux/linux/installer-poste.sh -u developpement -n -y
       - name: Tous les composants (simulation)
         run: SUDO_USER=testeur bash payload/linux/linux/installer-poste.sh -t -n -y
+
+  poste-sans-curl:
+    # Ubuntu de bureau n'a pas curl par défaut : le script doit l'installer lui-même avant de
+    # vérifier Internet (installation RÉELLE d'un petit composant, dans un conteneur jetable)
+    name: Installation réelle sans curl (${{ matrix.image }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ['ubuntu:26.04', 'debian:trixie']
+    container: ${{ matrix.image }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: curl absent au départ
+        run: '! command -v curl'
+      - name: Composant sauvegarde (Timeshift), réellement installé
+        run: |
+          useradd -m testeur
+          SUDO_USER=testeur bash payload/linux/linux/installer-poste.sh -c sauvegarde -y
+          command -v curl && command -v timeshift
