@@ -7,6 +7,8 @@ la [gestion sémantique de version](https://semver.org/lang/fr/) (`MAJEUR.MINEUR
 
 ## [Non publié]
 
+## [1.5.1] - 2026-10-12
+
 ### Corrigé
 
 - Clé Linux préparée sous Windows : `lancer.sh` et `installer-poste.sh` échouaient (« $'\r' : commande
@@ -185,7 +187,8 @@ Première version stable : clé Windows 11 complète, installable hors ligne.
 - Version unique (`VERSION`) affichée dans les fenêtres, les journaux et sur la clé.
 - Intégration continue : PSScriptAnalyzer, syntaxe PowerShell 5.1, lecture des profils et langues.
 
-[Non publié]: https://github.com/dreamdogbo/alchemist-usb/compare/v1.5.0...HEAD
+[Non publié]: https://github.com/dreamdogbo/alchemist-usb/compare/v1.5.1...HEAD
+[1.5.1]: https://github.com/dreamdogbo/alchemist-usb/compare/v1.5.0...v1.5.1
 [1.5.0]: https://github.com/dreamdogbo/alchemist-usb/compare/v1.4.2...v1.5.0
 [1.4.2]: https://github.com/dreamdogbo/alchemist-usb/compare/v1.4.1...v1.4.2
 [1.4.1]: https://github.com/dreamdogbo/alchemist-usb/compare/v1.4.0...v1.4.1
