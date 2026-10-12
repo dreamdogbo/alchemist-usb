@@ -7,6 +7,13 @@ la [gestion sémantique de version](https://semver.org/lang/fr/) (`MAJEUR.MINEUR
 
 ## [Non publié]
 
+### Corrigé
+
+- Clé Linux préparée sous Windows : `lancer.sh` et `installer-poste.sh` échouaient (« $'\r' : commande
+  introuvable », « env: 'bash\r' ») quand la copie du kit avait des fins de ligne Windows (Git pour Windows,
+  `core.autocrlf`). Le dépôt impose désormais LF aux scripts Linux (`.gitattributes`) et Build-Kit les
+  convertit en LF à la préparation de la clé, quelle que soit la copie du kit.
+
 ## [1.5.0] - 2026-10-12
 
 ### Ajouté

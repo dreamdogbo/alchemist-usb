@@ -1,0 +1,8 @@
+# Fins de ligne imposées, quel que soit le réglage Git du poste (core.autocrlf) :
+# une copie faite avec Git pour Windows convertirait sinon les scripts Linux en CRLF,
+# et bash échoue alors (« $'\r' : commande introuvable »).
+*.sh    text eol=lf
+*.conf  text eol=lf
+payload/linux/**  text eol=lf
+# Scripts de commandes Windows : CRLF attendu par cmd.exe
+*.bat   text eol=crlf
