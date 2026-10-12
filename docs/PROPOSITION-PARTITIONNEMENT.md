@@ -1,221 +1,164 @@
-# Proposition — Partitionnement selon le disque, l'usage et le système
+# Proposition — Partitionnement idéal selon le scénario, l'usage et le disque
 
-> **Statut : proposition, avec recommandation (section 8)** — rien n'est implémenté. Aujourd'hui, Alchemist ne partitionne
-> jamais le disque du poste : le technicien choisit le disque et la disposition dans l'installateur
-> officiel (Windows « Personnalisée », installateur de la distribution Linux).
+> **Statut : recommandation d'architecture, à valider** — rien n'est implémenté. Aujourd'hui, Alchemist
+> ne partitionne jamais le disque du poste : le technicien choisit le disque et la disposition dans
+> l'installateur officiel.
 
-## 1. Objectifs et garde-fous
+## 1. Principes directeurs
 
-**Objectif** : proposer, pour chaque combinaison **système** (Windows, Linux, double démarrage) ×
-**usage** (bureautique, développement) × **taille de disque**, une disposition éprouvée, appliquée
-automatiquement si le technicien le demande, et documentée sinon.
+1. **Un disque, un système** (« Full ») par défaut. L'autre système tourne *dans* le premier : WSL 2
+   sous Windows, LinOffice / WinBoat sous Linux. Le double démarrage est l'exception, sur demande.
+2. **Le moins de partitions possible.** Une partition de taille fixe est un pari sur l'avenir qui finit
+   toujours par être perdu (« `C:` plein, `D:` vide »). On découpe l'espace avec des outils souples :
+   sous-volumes Btrfs sous Linux, disque virtuel dynamique (VHDX) sous Windows.
+3. **Les partitions protègent mal les données ; les sauvegardes les protègent.** Instantanés
+   (Timeshift) pour revenir en arrière, OneDrive / sauvegarde externe pour les documents (règle 3-2-1).
+4. **Dispositions standard des éditeurs**, ajustées au minimum : un poste conforme à ce que Microsoft,
+   Canonical et Fedora attendent se met à jour, se répare et se dépanne sans surprise.
+5. **Chiffrement par défaut sur les portables**, avec clé de récupération remise au responsable du parc.
 
-**Garde-fous (non négociables)** :
+## 2. Garde-fous du mode automatique
 
-1. **Le mode manuel reste le défaut.** Le mode automatique est une option explicite, à la préparation
-   de la clé **et** au démarrage du poste.
-2. **Disque vide uniquement** par défaut : si le disque cible contient déjà des partitions, l'installation
-   automatique s'arrête. L'effacement d'un disque non vide exige un choix distinct « EFFACER le disque »
-   dans le menu Ventoy, plus une confirmation tapée (même logique que `-ConfirmerEffacement`).
-3. **Jamais la clé Ventoy, jamais un disque USB** comme cible ; un seul disque interne pris en compte
-   (le plus petit disque NVMe/SATA non amovible, affiché avant effacement).
-4. **ISO officielles non modifiées** : seuls des fichiers de réponse (unattend, autoinstall, kickstart,
-   preseed) et des scripts injectés par les plugins Ventoy sont utilisés.
+- Le mode **Manuel** (actuel) reste disponible et proposé en premier dans le menu Ventoy.
+- **Disque vide uniquement** ; un disque déjà partitionné arrête l'installation. L'effacement d'un disque
+  non vide est un choix distinct (« EFFACER le disque »), confirmé par une saisie.
+- Cible : un **disque interne** (NVMe, SATA), jamais la clé Ventoy ni un disque USB ; s'il y en a
+  plusieurs, le plus petit est proposé et affiché (modèle, taille) avant tout effacement.
+- ISO officielles **non modifiées** : seuls des fichiers de réponse et des scripts injectés par Ventoy.
 
-## 2. Classes de disque
+## 3. Scénarios et tailles minimales
 
-Les tailles sont celles annoncées par le fabricant (un disque « 256 Go » offre ≈ 238 Gio).
+| Scénario | Disque | L'autre système | Bureautique | Développement |
+| --- | --- | --- | --- | --- |
+| **Full Windows** | 100 % Windows | WSL 2 (Ubuntu), machine Podman | 128 Go min. · 256 Go conseillé | 256 Go min. · 512 Go conseillé |
+| **Full Linux** | 100 % Linux | LinOffice (Microsoft 365 intégral), WinBoat | 128 Go min. · **256 Go avec LinOffice** | 256 Go min. · 512 Go conseillé |
+| **Double démarrage** | partagé | installé à côté | 512 Go min. | 512 Go min. · **2 disques idéal** |
 
-| Classe | Taille | Windows seul | Linux seul | Double démarrage | Microsoft 365 intégral sous Linux (LinOffice, 64 Go) |
-| --- | --- | :-: | :-: | :-: | :-: |
-| **XS** | < 128 Go | ● | ● | ✗ refusé | ✗ refusé |
-| **S** | 128 – 255 Go | ● | ● | ✗ refusé | ⚠ déconseillé (≈ 60 Go restants) |
-| **M** | 256 – 511 Go | ● | ● | ● | ● (Linux seul) · ✗ en double démarrage |
-| **L** | 512 Go – 1 To | ● | ● | ● | ● |
-| **XL** | > 1 To ou 2ᵉ disque | ● | ● | ● | ● |
+Espace du système « invité », compté dans ces minima :
 
-Budget indicatif d'un poste installé (hors données) : système 25–40 Go ; stack bureautique +10 Go ;
-stack développement +30–60 Go (Flatpak, SDK, images de conteneurs) ; LinOffice 64 Go ; WSL 2 + Podman
-sous Windows 20–40 Go.
-
-## 3. Trois scénarios : Full Windows, Full Linux, Double démarrage
-
-Le scénario se choisit au démarrage (menu Ventoy), en plus du mode **Manuel** actuel.
-
-| Scénario | Disque | L'autre système… | Quand le choisir |
-| --- | --- | --- | --- |
-| **Full Windows** | 100 % Windows | **Linux dans Windows** : WSL 2 (Ubuntu), machine Podman | poste Windows, besoin ponctuel d'outils Linux |
-| **Full Linux** | 100 % Linux | **Windows dans Linux** : Microsoft 365 intégral (LinOffice), autres applications (WinBoat) | poste Linux, Office indispensable |
-| **Double démarrage** | partagé | installé à côté, au choix au démarrage | jeux, pilotes ou logiciels qui exigent un Windows *réel*, matériel spécifique |
-
-**Recommandation** : un **Full** (Windows ou Linux) par défaut. Grâce à WSL 2 d'un côté et à LinOffice /
-WinBoat de l'autre, le double démarrage n'est plus nécessaire dans la plupart des cas : il coupe le
-disque en deux, oblige à redémarrer pour changer de système et ajoute des pièges (BitLocker, démarrage
-rapide, horloge).
-
-L'espace du système « invité » est compté dans le dimensionnement :
-
-| Système invité | Où il est stocké | Budget prévu |
+| Invité | Emplacement | Budget |
 | --- | --- | --- |
-| WSL 2 (Full Windows) | disque virtuel dynamique dans le profil (`%LOCALAPPDATA%`), sur `C:` | 20 Go (bureautique, si coché) · 40–80 Go (développement) |
-| Machine Podman (Full Windows, développement) | disque virtuel WSL, sur `C:` | 20–40 Go |
-| LinOffice (Full Linux) | `~/.local/share/containers` (sous-volume `@home`) | **64 Go** libres exigés par LinOffice ; ≈ 25 Go occupés après installation (mesuré en CI : 85 → 60 Go libres) |
-| WinBoat (Full Linux, option) | conteneur Docker (`@docker`, emplacement du disque Windows à vérifier) | 64 Go conseillés |
+| WSL 2 | VHDX dynamique dans le profil, sur `C:` | 20 Go (bureautique) · 40–80 Go (développement) |
+| Machine Podman (Windows) | VHDX WSL, sur `C:` | 20–40 Go |
+| LinOffice | `~/.local/share/containers` (`@home`) | 64 Go libres exigés ; ≈ 25 Go occupés (mesuré en CI) |
+| WinBoat | conteneur Docker (`@docker`) | 64 Go conseillés (emplacement exact à vérifier) |
 
-Conséquences sur les dispositions ci-dessous :
-
-- **Full Windows** : `C:` reste large en développement (WSL 2 et Podman y vivent), d'où 200–300 Go ;
-  le Dev Drive reçoit les dépôts et les caches, pas les disques virtuels.
-- **Full Linux** : `/` et `/home` partagent tout l'espace (Btrfs), donc LinOffice et WinBoat n'ont pas de
-  partition à dimensionner ; minimum conseillé **256 Go** avec LinOffice (refusé sous 128 Go).
-- **Double démarrage** : ni LinOffice ni WSL 2 par défaut (le vrai système est à côté) ; LinOffice
-  seulement à partir de 512 Go.
-
-## 3 bis. Full Windows (Windows 11 seul)
-
-Disposition GPT/UEFI recommandée par Microsoft, avec deux ajustements :
-
-- partition **EFI de 260 Mo** (au lieu de 100 Mo, compatible disques 4K natifs) ;
-- partition de récupération **WinRE de 1 Go placée après `C:`** : marge pour les mises à jour de WinRE
-  (des partitions trop petites ont fait échouer la mise à jour KB5034441 en 2024).
-
-| Classe | Bureautique | Développement |
-| --- | --- | --- |
-| XS · S | EFI 260 Mo · MSR 16 Mo · **C: (tout)** · WinRE 1 Go | EFI · MSR · **C: (tout)** · WinRE · *Dev Drive en VHDX dynamique de 64 Go* |
-| M | EFI · MSR · **C: (tout)** · WinRE | EFI · MSR · **C: 200 Go** · WinRE · **D: Dev Drive (ReFS, reste)** |
-| L | EFI · MSR · **C: 200 Go** · WinRE · **D: Données (NTFS, reste)** | EFI · MSR · **C: 250 Go** · WinRE · **D: Dev Drive (ReFS, reste)** |
-| XL | EFI · MSR · **C: 250 Go** · WinRE · **D: Données (reste)** | EFI · MSR · **C: 300 Go** · WinRE · **D: Dev Drive 300 Go** · **E: Données (reste)** |
-
-Pourquoi :
-
-- **Bureautique** : une partition `D: Données` (à partir de 512 Go) permet de réinstaller Windows sans
-  toucher aux documents ; en dessous, un seul `C:` évite de « bloquer » de l'espace, et OneDrive
-  protège les dossiers.
-- **Développement** : un **Dev Drive** (ReFS, Windows 11 22H2+) accélère Git, npm, NuGet, Maven, etc.,
-  et Microsoft Defender l'analyse en mode performance. `C:` reste large car **WSL 2 et la machine
-  Podman** stockent leurs disques virtuels dans le profil de l'utilisateur.
-- **Chiffrement** : BitLocker (ou chiffrement de l'appareil) recommandé sur les portables ; la clé de
-  récupération doit être sauvegardée (compte local : impression ou fichier, pas de compte Microsoft).
-
-## 4. Full Linux (Linux seul)
-
-Une seule disposition, valable pour toutes les tailles, grâce à **Btrfs** et ses sous-volumes : pas de
-taille fixe pour `/` et `/home`, qui partagent tout l'espace.
-
-| Partition | Taille | Rôle |
-| --- | --- | --- |
-| EFI (FAT32) | 1 Go | chargeurs, micrologiciels (fwupd), plusieurs noyaux |
-| `/boot` (ext4) | 2 Go | **seulement si chiffrement LUKS** |
-| Btrfs (éventuellement dans LUKS2) | reste | sous-volumes ci-dessous |
-
-| Sous-volume | Point de montage | Instantanés Timeshift | Remarque |
-| --- | --- | :-: | --- |
-| `@` | `/` | ● | |
-| `@home` | `/home` | ● (option) | |
-| `@docker` | `/var/lib/docker` | — | développement : images et conteneurs exclus des instantanés |
-| `@swap` | `/swap` | — | fichier d'échange (sans copie à l'écriture) |
-| — | `~/.local/share/containers` | — | LinOffice : dossier en `chattr +C` (disque virtuel de Windows sans copie à l'écriture) |
-
-- **Timeshift** (installé par le composant `sauvegarde`) passe en **mode Btrfs** : instantanés immédiats
-  et sans coût d'espace, possibles uniquement avec la convention `@` / `@home`.
-- **Échange** : fichier de 4 Go (RAM ≥ 16 Go) à 8 Go (RAM < 16 Go) ; Fedora garde **zram**. Pas
-  d'hibernation (souvent bloquée par Secure Boot).
-- **Bureautique et développement** : même disposition ; seul `@docker` s'ajoute en développement.
-- **Chiffrement LUKS2** : proposé (coché pour les portables) ; la phrase secrète est demandée à
-  l'installation.
-
-## 5. Double démarrage (Windows + Linux)
-
-Windows est installé en premier, Linux ensuite sur l'espace laissé libre. **Une seule partition EFI**
-(1 Go, créée par le scénario Windows du kit), partagée.
-
-| Classe | Windows principal | Linux principal |
-| --- | --- | --- |
-| M (256 – 511 Go) | Windows 60 % · Linux 40 % | Windows 120 Go · Linux reste |
-| L (512 Go – 1 To) | Windows 60 % · Linux 40 % (min. 200 Go) | Windows 200 Go · Linux reste |
-| XL | Windows 50 % · Linux 40 % · partition NTFS « Partage » 10 % | Windows 250 Go · Linux reste · « Partage » 10 % |
-
-Réglages appliqués par les post-installations (indispensables en double démarrage) :
-
-- Windows : **démarrage rapide désactivé** (`powercfg /h off`), sinon la partition NTFS reste
-  « hibernée » et Linux ne peut pas l'écrire.
-- Horloge : Windows en UTC (`RealTimeIsUniversal = 1`), sinon une heure de décalage à chaque changement.
-- **BitLocker** : clé de récupération affichée avant l'installation de Linux (un changement de chargeur
-  peut la demander au prochain démarrage).
-- **LinOffice non proposé** en dessous de 512 Go : Office est déjà disponible nativement sous Windows.
-
-## 6. Mise en œuvre technique
-
-| Système | Mécanisme | Calcul des tailles | Points à valider |
-| --- | --- | --- | --- |
-| Windows 11 | Plugin Ventoy `auto_install` : plusieurs modèles unattend proposés au démarrage (« Manuel », « Automatique — Bureautique », « Automatique — Développement », « Double démarrage ») ; plugin Ventoy `injection` : script `diskpart` dans WinPE (passe `windowsPE`, `RunSynchronous`) | Le script lit la taille du disque, choisit la classe, crée les partitions (méthode Microsoft `shrink` pour placer WinRE après `C:`), puis `InstallTo` | Détection fiable du disque cible et du « disque vide » en WinPE ; Dev Drive créé par la post-installation (`Format-Volume -DevDrive`) |
-| Ubuntu | autoinstall (fichier `user-data` via `auto_install` Ventoy) | `early-commands` qui réécrit la section `storage` selon la taille | Prise en charge des sous-volumes Btrfs par l'installateur ; Ubuntu Desktop 24.04+ uniquement |
-| Fedora | kickstart | `%pre` qui génère `/tmp/part.ks` (`%include`) | Noms de sous-volumes `@`/`@home` (Fedora utilise `root`/`home` : Timeshift en mode rsync sinon) |
-| Debian | preseed | recettes `partman` (`min`/`priorité`/`max`) proportionnelles par nature | Sous-volumes Btrfs non gérés par partman : ext4 `/` unique en repli |
-| Linux Mint | preseed (installateur Ubiquity) | idem Debian | Prise en charge partielle : mode manuel conservé si non concluant |
-
-Côté moteur :
-
-- `Build-Kit.ps1 -Partitionnement Manuel|Auto` (défaut `Manuel`) ; profils : champ `Partitionnement`
-  avec les tailles ci-dessus (modifiable par l'administration) ;
-- assistants : case « Proposer l'installation automatique (efface un disque vide) » ;
-- `installer-poste.sh` et `Install-Poste.ps1` : réglages post-installation des sections 3 à 5.
-
-## 7. Feuille de route proposée
-
-| Étape | Contenu | Risque |
-| --- | --- | --- |
-| **1 — Sans partitionnement** | Post-installations : Timeshift en mode Btrfs s'il est disponible, `chattr +C` pour LinOffice, sous-volume `@docker` si possible, double démarrage (démarrage rapide, horloge UTC), Dev Drive en VHDX sous Windows (développement) | faible : rien n'est effacé |
-| **2 — Guide** | `docs/PARTITIONNEMENT.md` : ces dispositions à appliquer à la main dans les installateurs | nul |
-| **3 — Linux automatique** | Debian (preseed) puis Ubuntu (autoinstall) puis Fedora (kickstart), disque vide uniquement ; tests en VM sur GitHub Actions (KVM disponible, comme LinOffice) | moyen |
-| **4 — Windows automatique** | Modèles unattend + script WinPE ; tests en VM (dockur/windows ou QEMU) | moyen à élevé |
-
-## 8. Recommandation : le partitionnement idéal
-
-Les choix ci-dessous tranchent les questions ouvertes ; ils deviennent les valeurs par défaut du
-mode automatique (modifiables dans le profil).
-
-| Question | Choix recommandé | Raison |
-| --- | --- | --- |
-| Système de fichiers Linux | **Btrfs** (Ubuntu, Fedora) ; **ext4 `/` unique** en repli (Debian, Mint) | instantanés Timeshift immédiats et `/`–`/home` sans taille fixe ; Fedora l'utilise déjà par défaut ; preseed/Ubiquity ne savent pas créer de sous-volumes |
-| Chiffrement | **activé sur les portables** (batterie détectée), **désactivé sur les postes fixes** | un portable perdu expose les données ; sur un fixe, la phrase secrète au démarrage gêne sans gain réel |
-| Taille de `C:` | 200 Go (bureautique) · 250 Go (développement, L) · 300 Go (XL) | Windows + Office + mises à jour ≈ 60–80 Go ; WSL 2 et Podman en développement |
-| Dev Drive | partition ReFS dès 256 Go ; VHDX dynamique de 64 Go en dessous | performances Git/npm/NuGet sans figer d'espace sur les petits disques |
-| Scénario par défaut | **Full Windows** ou **Full Linux** selon le système choisi ; double démarrage seulement sur demande | WSL 2 et LinOffice/WinBoat couvrent l'autre système sans couper le disque |
-| Système principal en double démarrage | **Windows** pour la bureautique · **Linux** pour le développement | l'usage dominant obtient l'espace |
-| Ordre de mise en œuvre | **étape 1 d'abord** (réglages sans partitionnement) | gain immédiat, aucun risque d'effacement |
-
-### Dispositions retenues
-
-**Full Windows**
-
-| Disque | Bureautique | Développement |
-| --- | --- | --- |
-| < 256 Go | EFI 260 Mo · MSR · `C:` tout · WinRE 1 Go | idem + Dev Drive VHDX 64 Go (dynamique) |
-| 256 – 511 Go | EFI · MSR · `C:` tout · WinRE | EFI · MSR · `C:` 200 Go · WinRE · `D:` Dev Drive (reste) |
-| 512 Go – 1 To | EFI · MSR · `C:` 200 Go · WinRE · `D:` Données (reste) | EFI · MSR · `C:` 250 Go · WinRE · `D:` Dev Drive (reste) |
-| > 1 To | EFI · MSR · `C:` 250 Go · WinRE · `D:` Données (reste) | EFI · MSR · `C:` 300 Go · WinRE · `D:` Dev Drive 300 Go · `E:` Données (reste) |
-
-**Full Linux** (toutes tailles, bureautique et développement ; LinOffice dans `@home`, WinBoat dans `@docker`)
+## 4. Full Windows — disposition Microsoft, un seul `C:`
 
 ```
-EFI 1 Go (FAT32)
-[/boot 2 Go ext4 — portables chiffrés uniquement]
-Btrfs, reste du disque [dans LUKS2 sur les portables]
-  @        → /
-  @home    → /home
-  @docker  → /var/lib/docker     (développement ; exclu des instantanés)
-  @swap    → /swap/swapfile      (8 Go si RAM < 16 Go, sinon 4 Go ; zram sous Fedora)
+GPT / UEFI, Secure Boot actif
+├─ EFI        260 Mo   FAT32     (compatible disques 4K natifs)
+├─ MSR         16 Mo
+├─ C:         reste    NTFS      Windows, applications, profils, WSL 2, Podman
+└─ WinRE        1 Go   NTFS      récupération, APRÈS C: (agrandissable lors des mises à jour)
 ```
 
-**Double démarrage** (à partir de 256 Go)
+- **Pas de `D: Données`**, quelle que soit la taille : les profils, OneDrive, WSL et la plupart des
+  applications écrivent dans `C:` ; une partition de données se remplit rarement au bon rythme et
+  complique la redirection des dossiers. Les documents sont protégés par **OneDrive (déplacement des
+  dossiers connus)** ou une sauvegarde, pas par une partition.
+- **WinRE de 1 Go après `C:`** : les partitions de récupération trop petites ont fait échouer la mise à
+  jour KB5034441 (2024) ; placée après `C:`, elle reste extensible.
+- **Développement : Dev Drive en VHDX dynamique**, créé par la post-installation sur `C:` (ReFS,
+  Windows 11 22H2+, Defender en mode performance) : 128 Go maximum (256–511 Go), 256 Go (512 Go – 1 To),
+  512 Go (> 1 To). Il reçoit les dépôts et les caches (`npm`, `NuGet`, `Maven`, `pip`, `cargo`) ; il ne
+  réserve que l'espace réellement utilisé et se redimensionne sans repartitionner.
+- **BitLocker** : portables, clé de récupération imprimée ou enregistrée hors du poste (compte local).
+- Fichier d'échange et veille prolongée : gérés par Windows (aucun réglage).
+
+## 5. Full Linux — Btrfs à sous-volumes, une seule partition de données
+
+```
+GPT / UEFI, Secure Boot actif (shim signé)
+├─ EFI     1 Go   FAT32   chargeurs, micrologiciels (fwupd), plusieurs noyaux
+├─ /boot   2 Go   ext4    UNIQUEMENT si chiffrement (GRUB ne lit pas LUKS2/Argon2)
+└─ Btrfs   reste          [dans LUKS2 sur les portables]
+     @           /                  instantanés Timeshift
+     @home       /home              instantanés Timeshift (option) ; LinOffice ici
+     @var_log    /var/log           hors instantanés : un retour arrière garde les journaux
+     @docker     /var/lib/docker    développement / WinBoat ; hors instantanés
+     @swap       /swap              fichier d'échange (sans copie à l'écriture)
+```
+
+| Réglage | Valeur | Raison |
+| --- | --- | --- |
+| Options de montage | `noatime,compress=zstd:1` | moins d'écritures sur le SSD, 20–40 % d'espace gagné sur le système, coût CPU négligeable |
+| TRIM | `discard=async` (défaut des noyaux récents) + `fstrim.timer` | performance et durée de vie du SSD |
+| Mémoire d'échange | **zram** (50 % de la RAM, zstd, prioritaire) + fichier de **4 Go** dans `@swap` | réactivité sous pression mémoire ; le fichier évite les arrêts brutaux (OOM) ; pas d'hibernation (bloquée avec Secure Boot) |
+| Disques de machines virtuelles | `chattr +C` sur `~/.local/share/containers` (LinOffice) et `/var/lib/libvirt/images` | pas de copie à l'écriture : évite la fragmentation des disques virtuels |
+| Instantanés | **Timeshift en mode Btrfs**, 5 quotidiens + 3 hebdomadaires, avant chaque mise à jour | retour arrière en une minute ; *ce n'est pas une sauvegarde* |
+| Chiffrement | **LUKS2** sur les portables (phrase + clé de récupération) ; déverrouillage TPM2 là où la distribution le gère | perte ou vol |
+
+Distributions :
+
+- **Ubuntu LTS et Fedora** : disposition ci-dessus (Fedora utilise Btrfs par défaut ; les sous-volumes
+  sont renommés `@`/`@home` pour Timeshift).
+- **Debian et Linux Mint** : leurs installateurs automatiques ne créent pas de sous-volumes ; repli en
+  **ext4 `/` unique** + fichier d'échange + zram, sans instantanés Btrfs (Timeshift en mode rsync).
+
+Bureautique et développement partagent la même disposition : l'usage change le contenu, pas le
+découpage (`@docker` reste vide en bureautique).
+
+## 6. Double démarrage — seulement sur demande
+
+**Idéal : deux disques**, un par système, chacun avec sa propre partition EFI et sa disposition « Full »
+(sections 4 et 5). Aucune dépendance entre les deux : une mise à jour de l'un ne casse jamais l'autre ;
+le choix se fait au menu de démarrage du micrologiciel (F12…) ou dans GRUB.
+
+**Un seul disque (512 Go minimum)** :
+
+```
+├─ EFI     1 Go   FAT32   partagée (créée 1 Go par le scénario, pas 100 Mo)
+├─ MSR    16 Mo
+├─ C:      X      NTFS    Windows
+├─ WinRE   1 Go   NTFS
+├─ [/boot  2 Go   ext4    si chiffrement Linux]
+└─ Btrfs   reste          Linux (sous-volumes de la section 5)
+```
 
 | Disque | Bureautique (Windows principal) | Développement (Linux principal) |
 | --- | --- | --- |
-| 256 – 511 Go | Windows 60 % · Linux 40 % | Windows 120 Go · Linux reste |
-| 512 Go – 1 To | Windows 60 % · Linux 40 % | Windows 200 Go · Linux reste |
-| > 1 To | Windows 50 % · Linux 40 % · Partage NTFS 10 % | Windows 250 Go · Linux reste · Partage NTFS 10 % |
+| 512 Go – 1 To | `C:` 60 % · Linux 40 % | `C:` 200 Go · Linux reste |
+| > 1 To | `C:` 50 % · Linux 50 % | `C:` 250 Go · Linux reste |
 
-Une seule partition EFI de 1 Go, créée par le scénario Windows ; Windows en version « seul » réduite
-(sans `D:`), Linux en Btrfs comme ci-dessus ; démarrage rapide désactivé, horloge UTC ; LinOffice
-proposé seulement à partir de 512 Go.
+- Pas de partition « Partage » : Linux lit et écrit le NTFS de Windows (pilote `ntfs3`) ; les
+  documents communs vont dans OneDrive ou un dossier de `C:`.
+- Obligatoire : **démarrage rapide et veille prolongée désactivés** sous Windows (sinon le NTFS reste
+  « hiberné », Linux ne peut pas l'écrire et risque de le corrompre) ; **horloge en UTC** des deux côtés
+  (`RealTimeIsUniversal = 1`).
+- **BitLocker** : clé de récupération sauvegardée *avant* d'installer Linux (un changement de chargeur
+  peut la demander).
+- WSL 2 et LinOffice non installés par défaut : le vrai système est à côté.
+
+## 7. Mise en œuvre
+
+| Système | Mécanisme | Calcul des tailles | À valider |
+| --- | --- | --- | --- |
+| Windows 11 | plugin Ventoy `auto_install` : modèles unattend « Manuel », « Full Windows », « Double démarrage » ; plugin `injection` : script `diskpart` en WinPE (`RunSynchronous`) | disposition fixe (Full) ; `C:` calculé selon la taille (double démarrage) ; méthode Microsoft `shrink` pour WinRE après `C:` | détection du disque cible et du « disque vide » en WinPE |
+| Ubuntu LTS | autoinstall (`user-data` via `auto_install`) | `early-commands` qui écrit la section `storage` | sous-volumes Btrfs dans curtin ; Ubuntu Desktop 24.04+ |
+| Fedora | kickstart | `%pre` → `/tmp/part.ks` (`%include`) | renommage des sous-volumes |
+| Debian · Mint | preseed | recettes `partman` (proportionnelles par nature) | Ubiquity (Mint) : prise en charge partielle |
+| Post-installations | `installer-poste.sh`, `Install-Poste.ps1` | — | Dev Drive (`Format-Volume -DevDrive` sur un VHDX), zram, `chattr +C`, Timeshift Btrfs, réglages double démarrage |
+
+Tests : chaque scénario est installé en machine virtuelle sur GitHub Actions (KVM disponible, comme le
+test LinOffice), sur des disques virtuels de 128 Go, 256 Go et 1 To ; on vérifie la table de partitions
+obtenue, le démarrage, puis la post-installation.
+
+## 8. Feuille de route
+
+| Étape | Contenu | Risque |
+| --- | --- | --- |
+| **1 — Réglages sans partitionnement** | zram, `chattr +C` (LinOffice, libvirt), Timeshift en mode Btrfs s'il est disponible, Dev Drive VHDX (Windows, développement), double démarrage (démarrage rapide, horloge UTC) | faible : rien n'est effacé |
+| **2 — Guide** | `docs/PARTITIONNEMENT.md` : ces dispositions, pas à pas, dans les installateurs | nul |
+| **3 — Full Linux automatique** | Ubuntu puis Fedora, puis Debian/Mint (repli ext4) ; disque vide uniquement | moyen |
+| **4 — Full Windows automatique** | disposition Microsoft + WinRE après `C:` | moyen |
+| **5 — Double démarrage automatique** | deux disques d'abord, puis un seul disque | élevé |
+
+## 9. En résumé
+
+| | Full Windows | Full Linux | Double démarrage |
+| --- | --- | --- | --- |
+| Partitions | EFI · MSR · `C:` · WinRE | EFI · [/boot] · Btrfs | 2 disques, ou EFI partagée + Windows + Linux |
+| Découpage souple | Dev Drive VHDX | sous-volumes Btrfs | idem de chaque côté |
+| Protection | BitLocker (portables) · OneDrive / sauvegarde | LUKS2 (portables) · Timeshift + sauvegarde | les deux |
+| L'autre système | WSL 2 · Podman | LinOffice · WinBoat | à côté |
