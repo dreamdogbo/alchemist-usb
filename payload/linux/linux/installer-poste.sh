@@ -69,6 +69,7 @@ COMPOSANTS=(
   "winboat|WinBoat : toutes applications Windows dans un conteneur (alternative à LinOffice)|Bureautique|0|0"
   "creation|Création : GIMP, Inkscape, Krita, Kdenlive, OBS Studio, Audacity, HandBrake|Création|0|0"
   "artcraft|Suite ArtCraft : PhotoCraft, VectorCraft, FilmCraft, LightCraft, EffectCraft, DesignCraft|Création|0|0"
+  "raccourcis|Raccourcis sur le bureau des applications installées (à faire en dernier)|Système|1|1"
 )
 
 # ----------------------------------------------------------------------------- aide et options
@@ -693,7 +694,14 @@ comp_python() {
 comp_node() {
   local tag
   tag="$(github_tag nvm-sh/nvm)"; [ -z "$tag" ] && { jaune "  nvm : version introuvable"; return 1; }
-  en_utilisateur "export NVM_DIR=\"\$HOME/.nvm\"; [ -s \"\$NVM_DIR/nvm.sh\" ] || curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/$tag/install.sh | bash; . \"\$NVM_DIR/nvm.sh\"; nvm install --lts && nvm alias default 'lts/*' && corepack enable"
+  # nodejs.org peut ne pas répondre un instant (nvm affiche alors « N/A », code 3) : trois essais.
+  # corepack n'est plus livré avec Node.js à partir de la version 25 : installé avec npm s'il manque.
+  local cmd
+  cmd="export NVM_DIR=\"\$HOME/.nvm\"; [ -s \"\$NVM_DIR/nvm.sh\" ] || curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/$tag/install.sh | bash; . \"\$NVM_DIR/nvm.sh\"
+ok=0; for essai in 1 2 3; do if nvm install --lts; then ok=1; break; fi; [ \$essai -lt 3 ] && echo '  nodejs.org ne répond pas : nouvel essai dans 20 s…' && sleep 20; done
+[ \$ok -eq 1 ] || { echo '  nodejs.org injoignable : relancez plus tard avec « -c node »'; exit 3; }
+nvm alias default 'lts/*' && { command -v corepack >/dev/null || npm install -g corepack; } && corepack enable"
+  en_utilisateur "$cmd"
 }
 
 comp_java() {
@@ -797,6 +805,34 @@ comp_creation() {
   flatpak_installer org.gimp.GIMP org.inkscape.Inkscape org.kde.krita org.kde.kdenlive \
     com.obsproject.Studio org.audacityteam.Audacity fr.handbrake.ghb
   echo "  DaVinci Resolve (montage pro, natif Linux) : téléchargement manuel sur blackmagicdesign.com."
+}
+
+# Raccourcis sur le bureau de l'utilisateur pour les applications installées (seules celles présentes).
+# Ubuntu (icônes du bureau) : lanceur exécutable et marqué « de confiance ».
+RACCOURCIS=(
+  google-chrome.desktop microsoft-edge.desktop
+  word.desktop excel.desktop powerpoint.desktop outlook.desktop onenote.desktop
+  org.onlyoffice.desktopeditors.desktop libreoffice-startcenter.desktop
+  'pdfcraft*.desktop' Zoom.desktop org.keepassxc.KeePassXC.desktop timeshift-gtk.desktop
+  code.desktop io.podman_desktop.PodmanDesktop.desktop com.usebruno.Bruno.desktop io.dbeaver.DBeaverCommunity.desktop
+  'winboat*.desktop' kit-m365-teams.desktop
+)
+comp_raccourcis() {
+  local bureau motif fichier n=0
+  bureau="$(sudo -u "$UTILISATEUR" xdg-user-dir DESKTOP 2>/dev/null || true)"
+  [ -n "$bureau" ] && [ "$bureau" != "$HOME_UTILISATEUR" ] || bureau="$HOME_UTILISATEUR/Bureau"
+  [ -d "$bureau" ] || bureau="$HOME_UTILISATEUR/Desktop"
+  if [ "$SIMULATION" -eq 1 ]; then echo "  [simulation] raccourcis des applications installées dans $bureau"; return 0; fi
+  install -d -o "$UTILISATEUR" -g "$(id -gn "$UTILISATEUR")" "$bureau"
+  for motif in "${RACCOURCIS[@]}"; do
+    fichier="$(find /usr/share/applications /usr/local/share/applications /var/lib/flatpak/exports/share/applications \
+      "$HOME_UTILISATEUR/.local/share/applications" -maxdepth 1 -iname "$motif" 2>/dev/null | head -n 1)"
+    [ -n "$fichier" ] || continue
+    install -m 0755 -o "$UTILISATEUR" -g "$(id -gn "$UTILISATEUR")" "$fichier" "$bureau/$(basename "$fichier")"
+    en_session "gio set '$bureau/$(basename "$fichier")' metadata::trusted true" >/dev/null 2>&1 || true
+    n=$((n + 1))
+  done
+  echo "  $n raccourci(s) sur le bureau ($bureau)"
 }
 
 comp_artcraft() {

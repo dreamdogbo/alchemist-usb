@@ -89,6 +89,9 @@ verifier "Ansible" ansible --version
 verifier "AWS CLI" aws --version
 verifier "Azure CLI" az version
 
+echo "== Bureau"
+verifier "Raccourcis" sh -c 'n=$(ls "$(xdg-user-dir DESKTOP 2>/dev/null || echo "$HOME/Desktop")"/*.desktop "$HOME"/Bureau/*.desktop "$HOME"/Desktop/*.desktop 2>/dev/null | sort -u | wc -l); [ "$n" -gt 0 ] && echo "$n raccourci(s)"'
+
 echo
 if [ "$ECHECS" -eq 0 ]; then echo "Tous les outils sont opérationnels."; else echo "$ECHECS outil(s) en échec."; fi
 exit "$ECHECS"
