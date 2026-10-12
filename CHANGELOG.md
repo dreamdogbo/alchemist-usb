@@ -7,6 +7,12 @@ la [gestion sémantique de version](https://semver.org/lang/fr/) (`MAJEUR.MINEUR
 
 ## [Non publié]
 
+### Corrigé
+
+- Linux : « Pas d'accès à Internet » à tort sur Ubuntu de bureau, qui n'installe pas `curl` par défaut. Le
+  script installe désormais `curl` (et `python3`, `gpg` si besoin) avant de vérifier la connexion, accepte
+  toute réponse HTTP de trois sites, et affiche l'erreur réseau réelle en cas d'échec.
+
 ## [1.5.1] - 2026-10-12
 
 ### Corrigé
