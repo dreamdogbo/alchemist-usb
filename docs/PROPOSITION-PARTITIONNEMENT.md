@@ -1,6 +1,6 @@
 # Proposition — Partitionnement selon le disque, l'usage et le système
 
-> **Statut : proposition à discuter** — rien n'est implémenté. Aujourd'hui, Alchemist ne partitionne
+> **Statut : proposition, avec recommandation (section 8)** — rien n'est implémenté. Aujourd'hui, Alchemist ne partitionne
 > jamais le disque du poste : le technicien choisit le disque et la disposition dans l'installateur
 > officiel (Windows « Personnalisée », installateur de la distribution Linux).
 
@@ -100,7 +100,7 @@ Windows est installé en premier, Linux ensuite sur l'espace laissé libre. **Un
 | --- | --- | --- |
 | M (256 – 511 Go) | Windows 60 % · Linux 40 % | Windows 120 Go · Linux reste |
 | L (512 Go – 1 To) | Windows 60 % · Linux 40 % (min. 200 Go) | Windows 200 Go · Linux reste |
-| XL | Windows 50 % · Linux 50 % · *option : partition d'échange NTFS « Partage » 10 %* | idem |
+| XL | Windows 50 % · Linux 40 % · partition NTFS « Partage » 10 % | Windows 250 Go · Linux reste · « Partage » 10 % |
 
 Réglages appliqués par les post-installations (indispensables en double démarrage) :
 
@@ -137,10 +137,51 @@ Côté moteur :
 | **3 — Linux automatique** | Debian (preseed) puis Ubuntu (autoinstall) puis Fedora (kickstart), disque vide uniquement ; tests en VM sur GitHub Actions (KVM disponible, comme LinOffice) | moyen |
 | **4 — Windows automatique** | Modèles unattend + script WinPE ; tests en VM (dockur/windows ou QEMU) | moyen à élevé |
 
-## 8. Décisions à prendre
+## 8. Recommandation : le partitionnement idéal
 
-1. Btrfs par défaut sous Linux (instantanés Timeshift) ou ext4 (plus simple, choix par défaut d'Ubuntu) ?
-2. Chiffrement (BitLocker, LUKS) coché par défaut sur les portables ?
-3. Tailles de `C:` (200/250/300 Go) et du Dev Drive : à ajuster selon le parc ?
-4. Double démarrage : quel système est principal par défaut ?
-5. Démarrer par l'étape 1 (sans risque) avant tout partitionnement automatique ?
+Les choix ci-dessous tranchent les questions ouvertes ; ils deviennent les valeurs par défaut du
+mode automatique (modifiables dans le profil).
+
+| Question | Choix recommandé | Raison |
+| --- | --- | --- |
+| Système de fichiers Linux | **Btrfs** (Ubuntu, Fedora) ; **ext4 `/` unique** en repli (Debian, Mint) | instantanés Timeshift immédiats et `/`–`/home` sans taille fixe ; Fedora l'utilise déjà par défaut ; preseed/Ubiquity ne savent pas créer de sous-volumes |
+| Chiffrement | **activé sur les portables** (batterie détectée), **désactivé sur les postes fixes** | un portable perdu expose les données ; sur un fixe, la phrase secrète au démarrage gêne sans gain réel |
+| Taille de `C:` | 200 Go (bureautique) · 250 Go (développement, L) · 300 Go (XL) | Windows + Office + mises à jour ≈ 60–80 Go ; WSL 2 et Podman en développement |
+| Dev Drive | partition ReFS dès 256 Go ; VHDX dynamique de 64 Go en dessous | performances Git/npm/NuGet sans figer d'espace sur les petits disques |
+| Système principal en double démarrage | **Windows** pour la bureautique · **Linux** pour le développement | l'usage dominant obtient l'espace |
+| Ordre de mise en œuvre | **étape 1 d'abord** (réglages sans partitionnement) | gain immédiat, aucun risque d'effacement |
+
+### Dispositions retenues
+
+**Windows 11 seul**
+
+| Disque | Bureautique | Développement |
+| --- | --- | --- |
+| < 256 Go | EFI 260 Mo · MSR · `C:` tout · WinRE 1 Go | idem + Dev Drive VHDX 64 Go (dynamique) |
+| 256 – 511 Go | EFI · MSR · `C:` tout · WinRE | EFI · MSR · `C:` 200 Go · WinRE · `D:` Dev Drive (reste) |
+| 512 Go – 1 To | EFI · MSR · `C:` 200 Go · WinRE · `D:` Données (reste) | EFI · MSR · `C:` 250 Go · WinRE · `D:` Dev Drive (reste) |
+| > 1 To | EFI · MSR · `C:` 250 Go · WinRE · `D:` Données (reste) | EFI · MSR · `C:` 300 Go · WinRE · `D:` Dev Drive 300 Go · `E:` Données (reste) |
+
+**Linux seul** (toutes tailles, bureautique et développement)
+
+```
+EFI 1 Go (FAT32)
+[/boot 2 Go ext4 — portables chiffrés uniquement]
+Btrfs, reste du disque [dans LUKS2 sur les portables]
+  @        → /
+  @home    → /home
+  @docker  → /var/lib/docker     (développement ; exclu des instantanés)
+  @swap    → /swap/swapfile      (8 Go si RAM < 16 Go, sinon 4 Go ; zram sous Fedora)
+```
+
+**Double démarrage** (à partir de 256 Go)
+
+| Disque | Bureautique (Windows principal) | Développement (Linux principal) |
+| --- | --- | --- |
+| 256 – 511 Go | Windows 60 % · Linux 40 % | Windows 120 Go · Linux reste |
+| 512 Go – 1 To | Windows 60 % · Linux 40 % | Windows 200 Go · Linux reste |
+| > 1 To | Windows 50 % · Linux 40 % · Partage NTFS 10 % | Windows 250 Go · Linux reste · Partage NTFS 10 % |
+
+Une seule partition EFI de 1 Go, créée par le scénario Windows ; Windows en version « seul » réduite
+(sans `D:`), Linux en Btrfs comme ci-dessus ; démarrage rapide désactivé, horloge UTC ; LinOffice
+proposé seulement à partir de 512 Go.
