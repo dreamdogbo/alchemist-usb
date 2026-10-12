@@ -35,7 +35,7 @@ jobs:
       - name: Installation réelle de la stack développement
         run: |
           sudo bash payload/linux/linux/installer-poste.sh -u developpement -y \
-            -c base,zram,flatpak,pilotes,codecs,polices,bureau,securite,sauvegarde,chrome,onlyoffice,pdf,zoom,devbase,git,vscode,docker,podmandesktop,trivy,virtualisation,python,node,java,dotnet,go,rust,api,bdd,devops
+            -c base,zram,flatpak,pilotes,codecs,polices,bureau,securite,sauvegarde,chrome,onlyoffice,pdf,zoom,devbase,git,vscode,docker,podmandesktop,trivy,virtualisation,python,node,java,dotnet,go,rust,api,bdd,devops,raccourcis
 
       - name: Vérification de chaque outil
         run: bash tests/linux/verifier-poste.sh

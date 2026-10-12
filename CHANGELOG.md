@@ -7,6 +7,18 @@ la [gestion sémantique de version](https://semver.org/lang/fr/) (`MAJEUR.MINEUR
 
 ## [Non publié]
 
+### Ajouté
+
+- Linux : composant `raccourcis` (coché, exécuté en dernier) : raccourcis sur le bureau des applications
+  installées (Chrome, Microsoft 365, ONLYOFFICE, VS Code, Podman Desktop, Bruno, DBeaver, KeePassXC…), lanceurs
+  marqués « de confiance » pour les icônes du bureau d'Ubuntu.
+
+### Corrigé
+
+- Linux : Node.js en échec (« N/A », code 3) quand nodejs.org ne répondait pas au moment de l'installation :
+  trois essais espacés, puis un message clair. corepack est installé avec npm s'il n'est pas livré avec Node.js
+  (à partir de Node.js 25).
+
 ## [1.5.2] - 2026-10-12
 
 ### Corrigé
