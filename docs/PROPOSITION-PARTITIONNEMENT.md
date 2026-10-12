@@ -38,7 +38,40 @@ Budget indicatif d'un poste installé (hors données) : système 25–40 Go ; st
 stack développement +30–60 Go (Flatpak, SDK, images de conteneurs) ; LinOffice 64 Go ; WSL 2 + Podman
 sous Windows 20–40 Go.
 
-## 3. Windows 11 seul
+## 3. Trois scénarios : Full Windows, Full Linux, Double démarrage
+
+Le scénario se choisit au démarrage (menu Ventoy), en plus du mode **Manuel** actuel.
+
+| Scénario | Disque | L'autre système… | Quand le choisir |
+| --- | --- | --- | --- |
+| **Full Windows** | 100 % Windows | **Linux dans Windows** : WSL 2 (Ubuntu), machine Podman | poste Windows, besoin ponctuel d'outils Linux |
+| **Full Linux** | 100 % Linux | **Windows dans Linux** : Microsoft 365 intégral (LinOffice), autres applications (WinBoat) | poste Linux, Office indispensable |
+| **Double démarrage** | partagé | installé à côté, au choix au démarrage | jeux, pilotes ou logiciels qui exigent un Windows *réel*, matériel spécifique |
+
+**Recommandation** : un **Full** (Windows ou Linux) par défaut. Grâce à WSL 2 d'un côté et à LinOffice /
+WinBoat de l'autre, le double démarrage n'est plus nécessaire dans la plupart des cas : il coupe le
+disque en deux, oblige à redémarrer pour changer de système et ajoute des pièges (BitLocker, démarrage
+rapide, horloge).
+
+L'espace du système « invité » est compté dans le dimensionnement :
+
+| Système invité | Où il est stocké | Budget prévu |
+| --- | --- | --- |
+| WSL 2 (Full Windows) | disque virtuel dynamique dans le profil (`%LOCALAPPDATA%`), sur `C:` | 20 Go (bureautique, si coché) · 40–80 Go (développement) |
+| Machine Podman (Full Windows, développement) | disque virtuel WSL, sur `C:` | 20–40 Go |
+| LinOffice (Full Linux) | `~/.local/share/containers` (sous-volume `@home`) | **64 Go** libres exigés par LinOffice ; ≈ 25 Go occupés après installation (mesuré en CI : 85 → 60 Go libres) |
+| WinBoat (Full Linux, option) | conteneur Docker (`@docker`, emplacement du disque Windows à vérifier) | 64 Go conseillés |
+
+Conséquences sur les dispositions ci-dessous :
+
+- **Full Windows** : `C:` reste large en développement (WSL 2 et Podman y vivent), d'où 200–300 Go ;
+  le Dev Drive reçoit les dépôts et les caches, pas les disques virtuels.
+- **Full Linux** : `/` et `/home` partagent tout l'espace (Btrfs), donc LinOffice et WinBoat n'ont pas de
+  partition à dimensionner ; minimum conseillé **256 Go** avec LinOffice (refusé sous 128 Go).
+- **Double démarrage** : ni LinOffice ni WSL 2 par défaut (le vrai système est à côté) ; LinOffice
+  seulement à partir de 512 Go.
+
+## 3 bis. Full Windows (Windows 11 seul)
 
 Disposition GPT/UEFI recommandée par Microsoft, avec deux ajustements :
 
@@ -64,7 +97,7 @@ Pourquoi :
 - **Chiffrement** : BitLocker (ou chiffrement de l'appareil) recommandé sur les portables ; la clé de
   récupération doit être sauvegardée (compte local : impression ou fichier, pas de compte Microsoft).
 
-## 4. Linux seul
+## 4. Full Linux (Linux seul)
 
 Une seule disposition, valable pour toutes les tailles, grâce à **Btrfs** et ses sous-volumes : pas de
 taille fixe pour `/` et `/home`, qui partagent tout l'espace.
@@ -148,12 +181,13 @@ mode automatique (modifiables dans le profil).
 | Chiffrement | **activé sur les portables** (batterie détectée), **désactivé sur les postes fixes** | un portable perdu expose les données ; sur un fixe, la phrase secrète au démarrage gêne sans gain réel |
 | Taille de `C:` | 200 Go (bureautique) · 250 Go (développement, L) · 300 Go (XL) | Windows + Office + mises à jour ≈ 60–80 Go ; WSL 2 et Podman en développement |
 | Dev Drive | partition ReFS dès 256 Go ; VHDX dynamique de 64 Go en dessous | performances Git/npm/NuGet sans figer d'espace sur les petits disques |
+| Scénario par défaut | **Full Windows** ou **Full Linux** selon le système choisi ; double démarrage seulement sur demande | WSL 2 et LinOffice/WinBoat couvrent l'autre système sans couper le disque |
 | Système principal en double démarrage | **Windows** pour la bureautique · **Linux** pour le développement | l'usage dominant obtient l'espace |
 | Ordre de mise en œuvre | **étape 1 d'abord** (réglages sans partitionnement) | gain immédiat, aucun risque d'effacement |
 
 ### Dispositions retenues
 
-**Windows 11 seul**
+**Full Windows**
 
 | Disque | Bureautique | Développement |
 | --- | --- | --- |
@@ -162,7 +196,7 @@ mode automatique (modifiables dans le profil).
 | 512 Go – 1 To | EFI · MSR · `C:` 200 Go · WinRE · `D:` Données (reste) | EFI · MSR · `C:` 250 Go · WinRE · `D:` Dev Drive (reste) |
 | > 1 To | EFI · MSR · `C:` 250 Go · WinRE · `D:` Données (reste) | EFI · MSR · `C:` 300 Go · WinRE · `D:` Dev Drive 300 Go · `E:` Données (reste) |
 
-**Linux seul** (toutes tailles, bureautique et développement)
+**Full Linux** (toutes tailles, bureautique et développement ; LinOffice dans `@home`, WinBoat dans `@docker`)
 
 ```
 EFI 1 Go (FAT32)
