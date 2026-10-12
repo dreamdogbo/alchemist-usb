@@ -461,6 +461,12 @@ try {
         New-Item -ItemType Directory -Path $gen -Force | Out-Null
         $payload = Join-Path $kitRoot $(if ($config.ContainsKey('Payload')) { $config.Payload } else { 'payload/windows' })
         Copy-Item -Path (Join-Path $payload '*') -Destination $gen -Recurse -Force
+        # Scripts Linux : fins de ligne LF, même si la copie du kit les a converties en CRLF
+        # (Git pour Windows, archive décompressée par un outil Windows) ; bash échouerait sinon
+        foreach ($sh in @(Get-ChildItem -LiteralPath $gen -Recurse -File -Include '*.sh')) {
+            $texte = [IO.File]::ReadAllText($sh.FullName)
+            if ($texte.Contains("`r")) { [IO.File]::WriteAllText($sh.FullName, $texte.Replace("`r`n", "`n"), (New-Object Text.UTF8Encoding($false))) }
+        }
         $tz = 'Greenwich Standard Time'
         if ($config.ContainsKey('TimeZone')) { $tz = $config.TimeZone }
         if (Test-Path -LiteralPath (Join-Path $gen 'postinstall')) {
