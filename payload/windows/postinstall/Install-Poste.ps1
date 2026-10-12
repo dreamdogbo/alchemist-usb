@@ -277,6 +277,78 @@ function Install-ViaWinget {
     return ($LASTEXITCODE -in @(0, -1978335189))
 }
 
+function Get-SystemeLinuxDemarrage {
+    <#
+    .SYNOPSIS
+        Systèmes Linux présents dans les entrées de démarrage UEFI (double démarrage).
+    #>
+    $noms = foreach ($ligne in @(& bcdedit.exe /enum firmware 2>$null)) {
+        if ([string]$ligne -match '^\s*description\s+(.+)$' -and $Matches[1] -match '(?i)ubuntu|debian|fedora|mint|linux|grub|shim|opensuse|arch') { $Matches[1].Trim() }
+    }
+    return @($noms | Select-Object -Unique)
+}
+
+function Install-DevDrive {
+    <#
+    .SYNOPSIS
+        Crée un Dev Drive (ReFS) dans un VHDX dynamique sur C:, remonté à chaque démarrage.
+    .DESCRIPTION
+        Profil développement (réglage DevDrive du profil). Taille maximale selon C: : 128 Go (disque
+        < 512 Go), 256 Go (< 1 To), 512 Go au-delà, limitée à la moitié de l'espace libre (50 Go minimum).
+        Le VHDX ne consomme que l'espace réellement écrit. Caches npm, pip et NuGet redirigés.
+        Retourne @{ Statut ; Detail } pour le bilan (IGNORÉ si un prérequis manque).
+    #>
+    $vhdx = Join-Path $env:SystemDrive 'DevDrive\DevDrive.vhdx'
+    if (Test-Path -LiteralPath $vhdx) { return @{ Statut = 'DÉJÀ INSTALLÉ'; Detail = $vhdx } }
+    $cv = Get-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion'
+    $build = [int](Get-Prop $cv 'CurrentBuildNumber' 0); $ubr = [int](Get-Prop $cv 'UBR' 0)
+    if ($build -lt 22621 -or ($build -eq 22621 -and $ubr -lt 2338)) {
+        return @{ Statut = 'IGNORÉ'; Detail = "Windows 11 22621.2338 ou plus récent requis (poste : $build.$ubr) : mettre à jour puis relancer" }
+    }
+    $ramGo = [math]::Round((Get-CimInstance -ClassName Win32_ComputerSystem).TotalPhysicalMemory / 1GB)
+    if ($ramGo -lt 8) { return @{ Statut = 'IGNORÉ'; Detail = "8 Go de RAM minimum (poste : $ramGo Go)" } }
+    $c = Get-Volume -DriveLetter $env:SystemDrive.Substring(0, 1)
+    $libreGo = [math]::Floor($c.SizeRemaining / 1GB)
+    # 512 Go et 1 To « fabricant » = 476 et 931 Go vus par Windows
+    $maxGo = 512
+    if ($c.Size / 1GB -lt 476) { $maxGo = 128 } elseif ($c.Size / 1GB -lt 931) { $maxGo = 256 }
+    $maxGo = [int][math]::Min($maxGo, [math]::Floor($libreGo / 2))
+    if ($maxGo -lt 50) { return @{ Statut = 'IGNORÉ'; Detail = "espace libre insuffisant sur C: ($libreGo Go ; 100 Go nécessaires)" } }
+    $prises = @(Get-CimInstance -ClassName Win32_LogicalDisk | ForEach-Object { ([string]$_.DeviceID).Substring(0, 1) })
+    $lettre = @(68..90 | ForEach-Object { [string][char]$_ } | Where-Object { $_ -notin $prises }) | Select-Object -First 1
+    if (-not $lettre) { return @{ Statut = 'IGNORÉ'; Detail = 'aucune lettre de lecteur libre' } }
+
+    New-Item -ItemType Directory -Path (Split-Path -Parent $vhdx) -Force | Out-Null
+    $script = Join-Path $env:TEMP 'alchemist-devdrive.txt'
+    @("create vdisk file=`"$vhdx`" maximum=$($maxGo * 1024) type=expandable", 'attach vdisk', 'convert gpt',
+        'create partition primary', "assign letter=$lettre") | Set-Content -LiteralPath $script -Encoding ASCII
+    & diskpart.exe /s $script | Out-Null
+    $code = $LASTEXITCODE
+    Remove-Item -LiteralPath $script -Force -ErrorAction SilentlyContinue
+    if ($code -ne 0) { throw "diskpart a échoué (code $code)" }
+    try { Format-Volume -DriveLetter $lettre -DevDrive -NewFileSystemLabel 'DevDrive' -Confirm:$false -ErrorAction Stop | Out-Null }
+    catch {
+        & format.com "$($lettre):" /DevDrv /Q /V:DevDrive /Y | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw "formatage Dev Drive impossible : $($_.Exception.Message)" }
+    }
+
+    # Le VHDX est rattaché à chaque démarrage (même lettre, mémorisée par Windows)
+    $action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument ("-NoProfile -ExecutionPolicy Bypass -Command `"Mount-DiskImage -ImagePath '{0}' -ErrorAction SilentlyContinue`"" -f $vhdx)
+    $principal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
+    Register-ScheduledTask -TaskName 'Alchemist - Dev Drive' -Action $action -Trigger (New-ScheduledTaskTrigger -AtStartup) -Principal $principal -Force | Out-Null
+
+    # Dépôts et caches de paquets sur le Dev Drive (recommandations Microsoft)
+    $racine = "$($lettre):\"
+    $caches = [ordered]@{ npm_config_cache = 'Caches\npm'; PIP_CACHE_DIR = 'Caches\pip'; NUGET_PACKAGES = 'Caches\nuget' }
+    New-Item -ItemType Directory -Path (Join-Path $racine 'Projets') -Force | Out-Null
+    foreach ($nom in $caches.Keys) {
+        $dossier = Join-Path $racine $caches[$nom]
+        New-Item -ItemType Directory -Path $dossier -Force | Out-Null
+        [Environment]::SetEnvironmentVariable($nom, $dossier, 'Machine')
+    }
+    return @{ Statut = 'OK'; Detail = ("{0}: ReFS, VHDX dynamique {1} Go max ({2}) ; dossier Projets, caches npm/pip/NuGet" -f $lettre, $maxGo, $vhdx) }
+}
+
 if ($Etat) {
     # Mode lecture seule pour l'assistant graphique : état de chaque élément, en JSON
     $cat = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'catalogue.json') -Raw -Encoding UTF8 | ConvertFrom-Json
@@ -418,6 +490,24 @@ try {
             Add-Bilan -Nom "Fuseau $tzId" -Statut 'OK'
         }
         catch { Add-Bilan -Nom "Fuseau $tzId" -Statut 'ÉCHEC' -Detail $_.Exception.Message }
+
+        # Double démarrage avec Linux : horloge en UTC, démarrage rapide et veille prolongée désactivés
+        # (sinon le NTFS reste « hiberné » : Linux ne peut pas l'écrire sans risque)
+        try {
+            $linux = @(Get-SystemeLinuxDemarrage)
+            if ($linux.Count -gt 0) {
+                New-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\TimeZoneInformation' -Name 'RealTimeIsUniversal' -PropertyType DWord -Value 1 -Force | Out-Null
+                & powercfg.exe /hibernate off
+                Add-Bilan -Nom 'Double démarrage' -Statut 'OK' -Detail ("{0} détecté : horloge UTC, démarrage rapide désactivé" -f ($linux -join ', '))
+            }
+        }
+        catch { Add-Bilan -Nom 'Double démarrage' -Statut 'ÉCHEC' -Detail $_.Exception.Message }
+
+        # Dev Drive (profil développement)
+        if ($settings -and [bool](Get-Prop $settings 'DevDrive' $false)) {
+            try { $dd = Install-DevDrive; Add-Bilan -Nom 'Dev Drive' -Statut $dd.Statut -Detail $dd.Detail }
+            catch { Add-Bilan -Nom 'Dev Drive' -Statut 'ÉCHEC' -Detail $_.Exception.Message }
+        }
 
         # Acrobat Reader par défaut pour les PDF (méthode entreprise officielle :
         # fichier d'associations par défaut, appliqué à chaque ouverture de session)
