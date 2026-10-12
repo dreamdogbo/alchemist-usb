@@ -1,8 +1,8 @@
 # Proposition — Partitionnement idéal selon le scénario, l'usage et le disque
 
-> **Statut : recommandation d'architecture, à valider** — rien n'est implémenté. Aujourd'hui, Alchemist
-> ne partitionne jamais le disque du poste : le technicien choisit le disque et la disposition dans
-> l'installateur officiel.
+> **Statut : recommandation d'architecture.** L'étape 1 (réglages sans partitionnement) est livrée dans
+> la **v1.5.0** ; les étapes 2 à 5 restent à faire. Alchemist ne partitionne toujours pas le disque du
+> poste : le technicien choisit le disque et la disposition dans l'installateur officiel.
 
 ## 1. Principes directeurs
 
@@ -148,7 +148,7 @@ obtenue, le démarrage, puis la post-installation.
 
 | Étape | Contenu | Risque |
 | --- | --- | --- |
-| **1 — Réglages sans partitionnement** | zram, `chattr +C` (LinOffice, libvirt), Timeshift en mode Btrfs s'il est disponible, Dev Drive VHDX (Windows, développement), double démarrage (démarrage rapide, horloge UTC) | faible : rien n'est effacé |
+| **1 — Réglages sans partitionnement** ✅ v1.5.0 | zram, `chattr +C` (LinOffice, libvirt), Timeshift en mode Btrfs s'il est disponible, Dev Drive VHDX (Windows, développement), double démarrage (démarrage rapide, horloge UTC) | faible : rien n'est effacé |
 | **2 — Guide** | `docs/PARTITIONNEMENT.md` : ces dispositions, pas à pas, dans les installateurs | nul |
 | **3 — Full Linux automatique** | Ubuntu puis Fedora, puis Debian/Mint (repli ext4) ; disque vide uniquement | moyen |
 | **4 — Full Windows automatique** | disposition Microsoft + WinRE après `C:` | moyen |
