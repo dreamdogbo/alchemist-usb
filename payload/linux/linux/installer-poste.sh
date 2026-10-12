@@ -31,6 +31,7 @@ TOUT=0; SIMULATION=0; OUI=0; LISTE=0; TSV=0
 # id | libellé | catégorie | défaut bureautique (1/0) | défaut développement (1/0)
 COMPOSANTS=(
   "base|Mises à jour du système et outils de base|Système|1|1"
+  "zram|Mémoire compressée zram (réactivité, moins d'écritures sur le disque)|Système|1|1"
   "flatpak|Flatpak + Flathub (logithèque élargie)|Système|1|1"
   "pilotes|Pilotes recommandés et micrologiciels (fwupd)|Système|1|1"
   "codecs|Codecs multimédia et VLC|Système|1|1"
@@ -317,6 +318,34 @@ comp_base() {
   if [ -n "${KIT_TZ:-}" ]; then lancer timedatectl set-timezone "$KIT_TZ" || true; fi
 }
 
+# Mémoire d'échange compressée en RAM (zram, zstd, 50 % de la RAM, prioritaire sur le fichier d'échange)
+comp_zram() {
+  if paq_present zram-config || paq_present zram-tools; then echo "  zram déjà géré par zram-config / zram-tools : conservé"; return 0; fi
+  paquets "systemd-zram-generator" "zram-generator"
+  if [ -f /etc/systemd/zram-generator.conf ]; then echo "  /etc/systemd/zram-generator.conf existant : conservé"; return 0; fi
+  if [ "$SIMULATION" -eq 1 ]; then echo "  [simulation] /etc/systemd/zram-generator.conf : zram-size = ram / 2, zstd, priorité 100"
+  else
+    cat > /etc/systemd/zram-generator.conf <<'EOF'
+# Alchemist : mémoire d'échange compressée en RAM
+[zram0]
+zram-size = ram / 2
+compression-algorithm = zstd
+swap-priority = 100
+EOF
+  fi
+  lancer systemctl daemon-reload
+  lancer systemctl restart systemd-zram-setup@zram0.service || jaune "  zram actif au prochain démarrage"
+}
+
+# Btrfs : dossier sans copie à l'écriture (disques de machines virtuelles : évite la fragmentation).
+# N'agit que sur Btrfs et sur les fichiers créés ensuite ; sans effet sur ext4.
+sans_cow() {
+  local dossier="$1"
+  [ "$(stat -f -c %T "$(dirname "$dossier")" 2>/dev/null)" = "btrfs" ] || return 0
+  lancer install -d -m 0755 "$dossier"
+  if lancer chattr +C "$dossier"; then echo "  $dossier : sans copie à l'écriture (Btrfs)"; fi
+}
+
 comp_flatpak() {
   paquets "flatpak" "flatpak"
   [ "$DISTRO" = "ubuntu" ] && paquets "gnome-software-plugin-flatpak" ""
@@ -383,7 +412,31 @@ comp_securite() {
   fi
 }
 
-comp_sauvegarde() { paquets "timeshift" "timeshift"; }
+# Timeshift : configuré en mode Btrfs (instantanés immédiats) quand / est le sous-volume « @ » ;
+# sinon laissé à configurer (mode rsync : disque externe conseillé). Configuration existante conservée.
+comp_sauvegarde() {
+  paquets "timeshift" "timeshift"
+  local conf=/etc/timeshift/timeshift.json defaut=/etc/timeshift/default.json uuid
+  if [ -f "$conf" ]; then echo "  configuration Timeshift existante : conservée"; return 0; fi
+  if [ "$(findmnt -no FSTYPE /)" != "btrfs" ] || [ "$(findmnt -no FSROOT /)" != "/@" ]; then
+    jaune "  Timeshift : / n'est pas un sous-volume Btrfs « @ » ; à configurer (mode rsync, disque externe conseillé)"; return 0
+  fi
+  case "$(findmnt -no SOURCE /)" in /dev/mapper/*)
+    jaune "  Timeshift : système chiffré ; choisir le volume dans Timeshift au premier lancement"; return 0 ;;
+  esac
+  uuid="$(findmnt -no UUID /)"
+  if [ "$SIMULATION" -eq 1 ]; then echo "  [simulation] $conf : Btrfs ($uuid), 5 quotidiens + 3 hebdomadaires"; return 0; fi
+  [ -f "$defaut" ] || { jaune "  Timeshift : $defaut introuvable, configuration au premier lancement"; return 0; }
+  python3 - "$defaut" "$conf" "$uuid" <<'EOF'
+import json, sys
+c = json.load(open(sys.argv[1]))
+c.update({"backup_device_uuid": sys.argv[3], "parent_device_uuid": "", "do_first_run": "false",
+          "btrfs_mode": "true", "include_btrfs_home": "false",
+          "schedule_daily": "true", "count_daily": "5", "schedule_weekly": "true", "count_weekly": "3"})
+json.dump(c, open(sys.argv[2], "w"), indent=2)
+EOF
+  echo "  Timeshift : mode Btrfs, 5 instantanés quotidiens + 3 hebdomadaires (hors /home)"
+}
 
 comp_chrome() {
   if [ "$FAMILLE" = "deb" ]; then
@@ -479,6 +532,8 @@ comp_office365() {
     local uid; uid="$(id -u "$UTILISATEUR")"
     lancer systemctl start "user@$uid.service" || true
     for _ in $(seq 1 30); do [ -S "/run/user/$uid/bus" ] && break; sleep 1; done
+    # Disque virtuel de Windows sur Btrfs : sans copie à l'écriture (créé avant le stockage Podman)
+    en_session "mkdir -p ~/.local/share && [ \"\$(stat -f -c %T ~/.local/share)\" = btrfs ] && mkdir -p ~/.local/share/containers && chattr +C ~/.local/share/containers || true"
     en_session "podman system migrate >/dev/null 2>&1 || true"
     if ! en_session "podman info >/dev/null 2>&1"; then
       rouge "  Podman sans root ne fonctionne pas pour $UTILISATEUR :"
@@ -575,6 +630,7 @@ comp_virtualisation() {
           "qemu-kvm libvirt virt-manager virt-install edk2-ovmf"
   lancer usermod -aG kvm,libvirt "$UTILISATEUR"
   lancer systemctl enable --now libvirtd || true
+  sans_cow /var/lib/libvirt/images
 }
 
 # Podman Desktop (Flathub, Apache 2.0) : pilote le Docker Engine natif (/var/run/docker.sock) et Podman
@@ -799,6 +855,13 @@ etape "BILAN"
 printf '%s\n' "${BILAN[@]}"
 if [ "$SIMULATION" -eq 0 ]; then
   cp "$JOURNAL" "$HOME_UTILISATEUR/" 2>/dev/null && chown "$UTILISATEUR": "$HOME_UTILISATEUR/$(basename "$JOURNAL")" || true
+  # Double démarrage : Windows doit garder l'horloge en UTC et ne pas « hiberner » son NTFS
+  if compgen -G "/boot/efi/EFI/[Mm]icrosoft/Boot/bootmgfw.efi" >/dev/null; then
+    jaune "Double démarrage avec Windows détecté. Sous Windows, en administrateur, une seule fois :"
+    jaune "  reg add HKLM\\SYSTEM\\CurrentControlSet\\Control\\TimeZoneInformation /v RealTimeIsUniversal /t REG_DWORD /d 1 /f"
+    jaune "  powercfg /hibernate off      (démarrage rapide désactivé : NTFS lisible sans risque depuis Linux)"
+    jaune "  (fait automatiquement par la post-installation Windows d'Alchemist si Linux est installé en premier)"
+  fi
   echo "Redémarrez (ou déconnectez-vous) pour appliquer les groupes docker / kvm / libvirt et les chemins :"
   echo "d'ici là, « docker » sans sudo et Podman Desktop n'accèdent pas au Docker Engine."
 fi
