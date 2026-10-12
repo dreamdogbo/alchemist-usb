@@ -30,6 +30,15 @@ jobs:
           }
           if ($bad) { throw "$bad fichier(s) en erreur de syntaxe" }
 
+      - name: Scripts Linux en LF malgré une copie Windows (.gitattributes)
+        shell: pwsh
+        run: |
+          git config --get core.autocrlf
+          $crlf = @(Get-ChildItem -Recurse -File -Include *.sh, kit.conf | Where-Object { [IO.File]::ReadAllText($_.FullName).Contains("`r") })
+          $crlf | ForEach-Object { $_.FullName }
+          if ($crlf) { throw "$($crlf.Count) script(s) Linux en CRLF : bash échouera" }
+          "Scripts Linux : LF"
+
       - name: Profils et fichiers de langue lisibles
         shell: pwsh
         run: |
