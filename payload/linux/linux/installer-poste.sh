@@ -318,14 +318,26 @@ comp_base() {
   if [ -n "${KIT_TZ:-}" ]; then lancer timedatectl set-timezone "$KIT_TZ" || true; fi
 }
 
+# Fichier de configuration d'un paquet .deb resté tel que livré (empreinte enregistrée par dpkg)
+conffile_intact() {
+  local attendu
+  attendu="$(dpkg-query -W -f='${Conffiles}\n' "$1" 2>/dev/null | awk -v f="$2" '$1 == f { print $2 }')"
+  [ -n "$attendu" ] && [ "$(md5sum < "$2" | cut -d' ' -f1)" = "$attendu" ]
+}
+
 # Mémoire d'échange compressée en RAM (zram, zstd, 50 % de la RAM, prioritaire sur le fichier d'échange)
 comp_zram() {
   if paq_present zram-config || paq_present zram-tools; then echo "  zram déjà géré par zram-config / zram-tools : conservé"; return 0; fi
   paquets "systemd-zram-generator" "zram-generator"
-  if [ -f /etc/systemd/zram-generator.conf ]; then echo "  /etc/systemd/zram-generator.conf existant : conservé"; return 0; fi
-  if [ "$SIMULATION" -eq 1 ]; then echo "  [simulation] /etc/systemd/zram-generator.conf : zram-size = ram / 2, zstd, priorité 100"
+  local conf=/etc/systemd/zram-generator.conf
+  # Conservé s'il a été personnalisé ; remplacé s'il vient d'Alchemist ou du paquet sans modification
+  # (Ubuntu 24.04 installe un /etc/systemd/zram-generator.conf par défaut : 4 Go maximum)
+  if [ -f "$conf" ] && ! grep -q '^# Alchemist' "$conf" && ! conffile_intact systemd-zram-generator "$conf"; then
+    echo "  $conf personnalisé : conservé"; return 0
+  fi
+  if [ "$SIMULATION" -eq 1 ]; then echo "  [simulation] $conf : zram-size = ram / 2, zstd, priorité 100"
   else
-    cat > /etc/systemd/zram-generator.conf <<'EOF'
+    cat > "$conf" <<'EOF'
 # Alchemist : mémoire d'échange compressée en RAM
 [zram0]
 zram-size = ram / 2
