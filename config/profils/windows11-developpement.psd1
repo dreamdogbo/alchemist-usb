@@ -11,6 +11,9 @@
     Ordre       = 2
     Description = 'Bureautique + VS Code, Git/GitHub, WSL 2, Podman Desktop, Trivy, Python, Node.js, Java, .NET, Go, outils API et bases de données'
 
+    # Dev Drive (ReFS, VHDX dynamique sur C:) créé par la post-installation : dépôts et caches npm/pip/NuGet
+    DevDrive    = $true
+
     # La création graphique est souvent utile aux développeurs front : proposée cochée
     ParDefaut   = @('Inkscape', 'GIMP')
 

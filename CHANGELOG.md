@@ -7,6 +7,18 @@ la [gestion sémantique de version](https://semver.org/lang/fr/) (`MAJEUR.MINEUR
 
 ## [Non publié]
 
+### Ajouté
+
+- Linux : composant `zram` (coché) : mémoire d'échange compressée en RAM (zstd, 50 % de la RAM, prioritaire).
+- Linux : Timeshift configuré en **mode Btrfs** (5 instantanés quotidiens + 3 hebdomadaires) quand `/` est le
+  sous-volume `@` ; sinon laissé à configurer. Une configuration existante est conservée.
+- Linux sur Btrfs : disques de machines virtuelles sans copie à l'écriture (LinOffice, libvirt).
+- Windows, profil développement : **Dev Drive** (ReFS) dans un VHDX dynamique sur `C:`, remonté à chaque
+  démarrage, avec dossier `Projets` et caches npm, pip et NuGet ; ignoré si Windows, la RAM ou l'espace libre
+  ne le permettent pas.
+- Double démarrage : la post-installation Windows met l'horloge en UTC et désactive le démarrage rapide si un
+  Linux est détecté ; la post-installation Linux rappelle ces réglages si Windows est présent.
+
 ## [1.4.2] - 2026-10-11
 
 ### Ajouté

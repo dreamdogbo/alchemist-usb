@@ -35,14 +35,14 @@ jobs:
       - name: Installation réelle de la stack développement
         run: |
           sudo bash payload/linux/linux/installer-poste.sh -u developpement -y \
-            -c base,flatpak,pilotes,codecs,polices,bureau,securite,sauvegarde,chrome,onlyoffice,pdf,zoom,devbase,git,vscode,docker,podmandesktop,trivy,virtualisation,python,node,java,dotnet,go,rust,api,bdd,devops
+            -c base,zram,flatpak,pilotes,codecs,polices,bureau,securite,sauvegarde,chrome,onlyoffice,pdf,zoom,devbase,git,vscode,docker,podmandesktop,trivy,virtualisation,python,node,java,dotnet,go,rust,api,bdd,devops
 
       - name: Vérification de chaque outil
         run: bash tests/linux/verifier-poste.sh
 
       - name: Idempotence (deuxième passage, rien à refaire)
         run: |
-          sudo bash payload/linux/linux/installer-poste.sh -u developpement -y -c git,vscode,docker,podmandesktop,trivy,python,go 2>&1 | tee /tmp/second.log
+          sudo bash payload/linux/linux/installer-poste.sh -u developpement -y -c zram,sauvegarde,git,vscode,docker,podmandesktop,trivy,python,go 2>&1 | tee /tmp/second.log
           grep -c 'déjà' /tmp/second.log
 
       - name: Microsoft 365 intégral (simulation)

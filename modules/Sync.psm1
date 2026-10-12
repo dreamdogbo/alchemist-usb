@@ -228,7 +228,8 @@ function New-KitCatalogue {
         [Parameter(Mandatory)] [string] $KeyRoot,
         [Parameter(Mandatory)] [string] $Destination,
         [string] $ProfileName = '',
-        [string] $TimeZone = 'Greenwich Standard Time'
+        [string] $TimeZone = 'Greenwich Standard Time',
+        [bool] $DevDrive = $false
     )
     $entries = foreach ($item in $Items) {
         if ($item.Type -in @('WindowsIso', 'LinuxIso')) { continue }
@@ -270,7 +271,7 @@ function New-KitCatalogue {
     $doc = [ordered]@{
         Generated = (Get-Date).ToString('s')
         Profile   = $ProfileName
-        Settings  = [ordered]@{ TimeZone = $TimeZone }
+        Settings  = [ordered]@{ TimeZone = $TimeZone; DevDrive = $DevDrive }
         Items     = @($entries | Sort-Object { $_.Order })
     }
     $json = $doc | ConvertTo-Json -Depth 5

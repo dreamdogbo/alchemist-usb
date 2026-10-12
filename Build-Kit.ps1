@@ -466,7 +466,7 @@ try {
         if (Test-Path -LiteralPath (Join-Path $gen 'postinstall')) {
             # Windows : version embarquée et catalogue de la post-installation
             [IO.File]::WriteAllText((Join-Path $gen 'postinstall/VERSION'), "$kitVersion`n", (New-Object Text.UTF8Encoding($false)))
-            [void](New-KitCatalogue -Items $allItems -KeyRoot $keyRoot -Destination (Join-Path $gen 'postinstall/catalogue.json') -ProfileName $Profil -TimeZone $tz)
+            [void](New-KitCatalogue -Items $allItems -KeyRoot $keyRoot -Destination (Join-Path $gen 'postinstall/catalogue.json') -ProfileName $Profil -TimeZone $tz -DevDrive ($config.ContainsKey('DevDrive') -and [bool]$config.DevDrive))
         }
         if (Test-Path -LiteralPath (Join-Path $gen 'linux')) {
             # Linux : profil d'usage lu par le script de post-installation

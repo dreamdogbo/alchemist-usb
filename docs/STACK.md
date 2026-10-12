@@ -13,9 +13,9 @@ familles apt (Ubuntu, Mint, Debian) et dnf (Fedora), dépôts officiels des édi
 
 | Domaine | Outils | Bureautique | Développement |
 | --- | --- | :-: | :-: |
-| Système | mises à jour, Flatpak + Flathub, pilotes (ubuntu-drivers) et micrologiciels (fwupd), codecs + VLC, réglages GNOME | ● | ● |
+| Système | mises à jour, **zram** (mémoire compressée), Flatpak + Flathub, pilotes (ubuntu-drivers) et micrologiciels (fwupd), codecs + VLC, réglages GNOME | ● | ● |
 | Polices | compatibles Office : Carlito (Calibri), Caladea (Cambria), Liberation, Microsoft core fonts, Fira Code | ● | ● |
-| Sécurité | pare-feu (ufw / firewalld), ClamAV + ClamTk, KeePassXC, Timeshift | ● | ● |
+| Sécurité | pare-feu (ufw / firewalld), ClamAV + ClamTk, KeePassXC, Timeshift (configuré en mode Btrfs si `/` est le sous-volume `@`) | ● | ● |
 | Navigateurs | Google Chrome (Firefox déjà présent) · Microsoft Edge | ● · ○ | ● · ○ |
 | **Microsoft 365 intégral** | **Word, Excel, PowerPoint, Outlook, OneNote de bureau** via **LinOffice** (Windows léger KVM + FreeRDP, applications dans le menu Linux) | ● | ● |
 | Raccourcis web (option) | Teams (Microsoft ne publie plus Teams de bureau pour Linux), OneDrive | ○ | ○ |
@@ -117,6 +117,7 @@ Contenu **hors ligne** sur la clé, installé par `postinstall\Lancer.bat` (fen�
 | Communication | Teams, Zoom | ● | ● |
 | Sécurité | Microsoft Defender (intégré) + **ClamAV** (analyse à la demande) · KeePassXC | ● · | ● |
 | Éditeur et terminal | **VS Code**, PowerShell 7, PowerToys · JetBrains Toolbox | | ● · ○ |
+| Stockage | **Dev Drive** (ReFS, VHDX dynamique sur `C:`, lecteur `D:` ou suivant) : dossier `Projets`, caches npm, pip et NuGet | | ● |
 | Git | **Git**, **GitHub CLI** · GitHub Desktop | | ● · ○ |
 | Conteneurs | **WSL 2**, **Podman** + **Podman Desktop** · Docker Desktop | | ● · ○ |
 | Sécurité des conteneurs | **Trivy** (ajouté au PATH) | | ● |
