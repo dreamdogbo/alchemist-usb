@@ -26,6 +26,7 @@ flatpak_app() { flatpak info "$1" 2>/dev/null | grep -m1 -E '^ *(Version|Branche
 echo "== Système et sécurité"
 verifier "Flatpak + Flathub" sh -c 'flatpak remotes | grep -q flathub && flatpak --version'
 verifier "fwupd" fwupdmgr --version
+verifier "zram" sh -c 'swapon --show=NAME --noheadings | grep -q zram && echo "actif" || { test -f /etc/systemd/zram-generator.conf && echo "configuré (actif au prochain démarrage)"; }'
 verifier "VLC" vlc --version
 verifier "Polices Carlito" sh -c 'fc-list | grep -qi carlito && echo présentes'
 verifier "Pare-feu ufw" sh -c 'command -v ufw >/dev/null && echo installé'
