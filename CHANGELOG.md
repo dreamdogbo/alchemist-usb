@@ -7,6 +7,8 @@ la [gestion sémantique de version](https://semver.org/lang/fr/) (`MAJEUR.MINEUR
 
 ## [Non publié]
 
+## [1.6.0] - 2026-10-14
+
 ### Corrigé
 
 - Windows : l'assistant ne se lançait pas, sans aucun message (PowerShell démarré sans fenêtre). Nouveau
@@ -246,7 +248,8 @@ Première version stable : clé Windows 11 complète, installable hors ligne.
 - Version unique (`VERSION`) affichée dans les fenêtres, les journaux et sur la clé.
 - Intégration continue : PSScriptAnalyzer, syntaxe PowerShell 5.1, lecture des profils et langues.
 
-[Non publié]: https://github.com/dreamdogbo/alchemist-usb/compare/v1.5.2...HEAD
+[Non publié]: https://github.com/dreamdogbo/alchemist-usb/compare/v1.6.0...HEAD
+[1.6.0]: https://github.com/dreamdogbo/alchemist-usb/compare/v1.5.2...v1.6.0
 [1.5.2]: https://github.com/dreamdogbo/alchemist-usb/compare/v1.5.1...v1.5.2
 [1.5.1]: https://github.com/dreamdogbo/alchemist-usb/compare/v1.5.0...v1.5.1
 [1.5.0]: https://github.com/dreamdogbo/alchemist-usb/compare/v1.4.2...v1.5.0
