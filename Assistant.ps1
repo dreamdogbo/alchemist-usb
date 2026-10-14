@@ -34,12 +34,17 @@ Add-Type -AssemblyName System.Drawing
 [System.Windows.Forms.Application]::EnableVisualStyles()
 # Une erreur imprévue dans la fenêtre est écrite dans le journal au lieu d'afficher
 # la boîte « exception non gérée » de .NET
-[System.Windows.Forms.Application]::SetUnhandledExceptionMode([System.Windows.Forms.UnhandledExceptionMode]::CatchException)
-[System.Windows.Forms.Application]::add_ThreadException({
-        param($s, $e)
-        [void]$s
-        try { Add-LogLine -Line ('[ERROR] ' + $e.Exception.Message) } catch { Write-Verbose $e.Exception.Message }
-    })
+# Une seule fois par processus : le changement de langue relance l'assistant dans le même
+# processus, et Windows refuse de modifier ce mode une fois des fenêtres créées.
+if (-not [AppDomain]::CurrentDomain.GetData('AlchemistUiReady')) {
+    [AppDomain]::CurrentDomain.SetData('AlchemistUiReady', $true)
+    [System.Windows.Forms.Application]::SetUnhandledExceptionMode([System.Windows.Forms.UnhandledExceptionMode]::CatchException)
+    [System.Windows.Forms.Application]::add_ThreadException({
+            param($s, $e)
+            [void]$s
+            try { Add-LogLine -Line ('[ERROR] ' + $e.Exception.Message) } catch { Write-Verbose $e.Exception.Message }
+        })
+}
 
 $kitRoot = $PSScriptRoot
 Import-Module (Join-Path $kitRoot 'modules\Report.psm1') -Force -DisableNameChecking
