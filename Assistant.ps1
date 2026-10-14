@@ -159,6 +159,7 @@ function Update-DriveList {
         # Clé neuve : disques USB/SD éligibles (jamais le disque système : filtré par Get-KitUsbDisk)
         foreach ($u in @(Get-KitUsbDisk)) {
             $state = if ($u.IsVentoy) { T 'UsbVentoy' } else { T 'UsbNotVentoy' }
+            if ($u.IsReadOnly) { $state += ' — ' + (T 'UsbReadOnly') }
             $letters = (@($u.Letters | ForEach-Object { "${_}:" }) -join ' ')
             [void]$script:DriveCombo.Items.Add(((T 'UsbDiskFormat') -f $u.Number, $u.Model, $u.SizeGB, ("$state $letters").Trim()))
             $script:DriveItems += $u
@@ -307,7 +308,15 @@ function Start-Build {
     $sp = @{ FilePath = $hostExe; ArgumentList = $argList; WindowStyle = 'Hidden'; PassThru = $true }
     # Ventoy (installation ou mise à jour) : droits administrateur requis
     if (($installVentoy -or $script:ChkUpdateVentoy.Checked) -and -not $Simulation -and -not (Test-KitAdmin)) { $sp['Verb'] = 'RunAs' }
-    $script:Process = Start-Process @sp
+    try { $script:Process = Start-Process @sp }
+    catch {
+        # Autorisation administrateur refusée (bouton « Non » de Windows) ou lancement impossible
+        $script:Process = $null
+        Add-LogLine -Line ('[ERROR] ' + $_.Exception.Message)
+        $why = $(if ($sp.ContainsKey('Verb')) { T 'UacRefused' } else { (T 'LaunchFailed') -f $_.Exception.Message })
+        [void][System.Windows.Forms.MessageBox]::Show($why, 'Alchemist', 'OK', 'Warning')
+        return
+    }
     Add-LogLine -Line ((T 'Starting') -f (($argList | Select-Object -Skip 5) -join ' '))
     Set-Running -Running $true
     $script:Timer.Start()

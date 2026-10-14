@@ -10,7 +10,7 @@
     DriveLabel      = 'Ventoy key:'
     Refresh         = 'Refresh'
     GetVentoy       = 'No Ventoy key yet? Download Ventoy'
-    NoDrive         = '(no "Ventoy" key detected — install Ventoy on the key, then Refresh)'
+    NoDrive         = '(no Ventoy key detected — plug it in and Refresh, or tick "New key: install Ventoy")'
     DriveFormat     = '{0}  —  {1}  —  {2} GB free of {3} GB'
     ColItem         = 'Item'
     ColSize         = 'Size'
@@ -68,4 +68,7 @@
     UsageBureautique   = 'Office'
     UsageDeveloppement = 'Development'
     LinuxHint       = 'Linux: software (office, development…) is chosen on the workstation with linux/lancer.sh.'
+    UsbReadOnly     = 'write-protected'
+    UacRefused      = 'Administrator permission was declined: Ventoy cannot be installed or updated without it. Nothing was changed on the key.'
+    LaunchFailed    = 'The preparation could not start: {0}'
 }

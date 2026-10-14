@@ -11,7 +11,7 @@
     DriveLabel      = 'Clé Ventoy :'
     Refresh         = 'Actualiser'
     GetVentoy       = 'Pas encore de clé Ventoy ? Télécharger Ventoy'
-    NoDrive         = '(aucune clé « Ventoy » détectée — installez Ventoy sur la clé puis Actualiser)'
+    NoDrive         = '(aucune clé Ventoy détectée — branchez-la puis Actualiser, ou cochez « Clé neuve : installer Ventoy »)'
     DriveFormat     = '{0}  —  {1}  —  {2} Go libres sur {3} Go'
     ColItem         = 'Élément'
     ColSize         = 'Taille'
@@ -69,4 +69,7 @@
     UsageBureautique   = 'Bureautique'
     UsageDeveloppement = 'Développement'
     LinuxHint       = 'Linux : les logiciels (bureautique, développement…) se choisissent sur le poste avec linux/lancer.sh.'
+    UsbReadOnly     = 'protégé en écriture'
+    UacRefused      = 'L''autorisation administrateur a été refusée : Ventoy ne peut pas être installé ni mis à jour sans elle. Rien n''a été modifié sur la clé.'
+    LaunchFailed    = 'La préparation n''a pas pu démarrer : {0}'
 }
