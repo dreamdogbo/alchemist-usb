@@ -64,7 +64,7 @@ function Get-KitUsbDisk {
                 IsOffline  = [bool]$d.IsOffline
             }
         }
-        return , @($list)
+        return @($list | Where-Object { $null -ne $_ })
     }
     # Linux : lsblk ; on écarte tout disque portant / , /boot , /boot/efi , /home ou le swap
     $blocks = @(Get-KitLinuxBlock)
@@ -87,7 +87,7 @@ function Get-KitUsbDisk {
             IsOffline  = $false
         }
     }
-    return , @($list)
+    return @($list | Where-Object { $null -ne $_ })
 }
 
 function Assert-KitVentoyTarget {

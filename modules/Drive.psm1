@@ -40,7 +40,7 @@ function Get-KitLinuxBlock {
     [OutputType([object[]])]
     param()
     $json = & lsblk -J -b -o NAME,PATH,TYPE,SIZE,LABEL,FSTYPE,MOUNTPOINT,TRAN,MODEL,RM 2>$null | Out-String
-    if (-not $json.Trim()) { return , @() }
+    if (-not $json.Trim()) { return }
     $flat = New-Object System.Collections.Generic.List[object]
     $stack = New-Object System.Collections.Stack
     foreach ($n in @(($json | ConvertFrom-Json).blockdevices)) { $stack.Push(@($n, $null)) }
@@ -52,7 +52,9 @@ function Get-KitLinuxBlock {
         if ($n.type -eq 'disk') { $next = $n }
         if ($n.PSObject.Properties['children'] -and $n.children) { foreach ($c in @($n.children)) { $stack.Push(@($c, $next)) } }
     }
-    return , $flat.ToArray()
+    # Éléments émis un par un : l'appelant écrit @(Get-KitLinuxBlock). Avec « return , $tableau »,
+    # @() obtenait UN élément contenant toute la liste (détection faussée, plantage sans clé).
+    return $flat.ToArray()
 }
 
 function Get-KitFreeSpace {
@@ -80,8 +82,8 @@ function Get-KitVentoyDiskNumber {
     [CmdletBinding()]
     [OutputType([int[]])]
     param()
-    try { return , @(Get-Volume -FileSystemLabel 'VTOYEFI' -ErrorAction Stop | Get-Partition -ErrorAction Stop | ForEach-Object { [int]$_.DiskNumber } | Select-Object -Unique) }
-    catch { Write-Verbose 'Aucune partition VTOYEFI visible.'; return , @() }
+    try { return @(Get-Volume -FileSystemLabel 'VTOYEFI' -ErrorAction Stop | Get-Partition -ErrorAction Stop | ForEach-Object { [int]$_.DiskNumber } | Select-Object -Unique) }
+    catch { Write-Verbose 'Aucune partition VTOYEFI visible.'; return }
 }
 
 function Test-KitLinuxVentoyPart {
@@ -135,7 +137,7 @@ function Find-KitVentoyDrive {
             }
             catch { Write-Verbose "Lecteur $($d.Name) illisible : $($_.Exception.Message)" }
         }
-        return , @($found)
+        return @($found | Where-Object { $null -ne $_ })
     }
     $blocks = @(Get-KitLinuxBlock)
     $found = foreach ($b in $blocks) {
@@ -153,7 +155,7 @@ function Find-KitVentoyDrive {
             ByPartition = $byPartition
         }
     }
-    return , @($found)
+    return @($found | Where-Object { $null -ne $_ })
 }
 
 function Test-KitDrive {
