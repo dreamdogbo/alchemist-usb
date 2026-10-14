@@ -40,6 +40,7 @@
 | --- | --- |
 | 🧭 **Choix guidé** | Système (Windows / Linux) → usage (bureautique / développement) → versions → clé |
 | 🪟 **Windows 11** | ISO officielle (FR, EN, ES, DE, PT), Microsoft 365 hors ligne **ou** LibreOffice / ONLYOFFICE, logiciels, **installation 100 % hors ligne** |
+| 🕰️ **Windows 10 / 7** | Windows 10 22H2 officiel en option (PC sans TPM 2.0) ; Windows 7 / 8.1 avec **votre** ISO + pack de compatibilité (.NET 4.8, PowerShell 5.1, Firefox ESR) |
 | 🐧 **Linux** | Ubuntu LTS (recommandé), Linux Mint, Debian, Fedora — stack bureautique ou développeur via les dépôts officiels |
 | 👩‍💻 **Développeurs** | VS Code, Git + GitHub CLI, Docker Engine natif + Podman Desktop, Trivy (scan de sécurité), WSL 2, Python/uv, Node.js LTS, Java, .NET, Go, Rust, Bruno, DBeaver… |
 | 📄 **Microsoft 365 sous Linux** | **version de bureau intégrale** (vrai Word, Excel, PowerPoint, Outlook, OneNote) via LinOffice, + ONLYOFFICE |

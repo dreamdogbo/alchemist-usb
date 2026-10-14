@@ -71,4 +71,13 @@
     UsbReadOnly     = 'write-protected'
     UacRefused      = 'Administrator permission was declined: Ventoy cannot be installed or updated without it. Nothing was changed on the key.'
     LaunchFailed    = 'The preparation could not start: {0}'
+    ColWindows      = 'Windows'
+    OtherWindows    = 'Other Windows versions:'
+    Win10Link       = 'Windows 10 (22H2): tick "Windows10" in the list — Microsoft page'
+    Win10Url        = 'https://www.microsoft.com/en-us/software-download/windows10ISO'
+    IsoPerso        = 'Own ISO (Windows 7…)'
+    IsoPersoDialog  = 'Images to copy to the key (licensed Windows 7, 8.1, other system…)'
+    Win10Hint       = 'Windows 10: all ticked software and the post-installation also work on Windows 10 (Microsoft support ended: ESU recommended).'
+    Win7Hint        = 'Windows 7: compatibility pack ticked (.NET 4.8, PowerShell 5.1, Firefox ESR). Instructions on the key: postinstall\Windows7.txt.'
+    Win7PackChecked = 'Windows 7 ISO detected: {0} Windows 7 compatible program(s) ticked ("Compatibilité Windows 7" category).'
 }

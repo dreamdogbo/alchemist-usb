@@ -64,6 +64,9 @@ $script:LangCodes = @()
 $script:DriveItems = @()
 $script:ChkInstallVentoy = $null
 $script:ChkUpdateVentoy = $null
+$script:PersonalIsos = @()
+$script:IsoPersoBox = $null
+$script:BtnIsoPersoClear = $null
 
 # --------------------------------------------------------------------------- langue de l'interface
 $langDir = Join-Path $kitRoot 'lang'
@@ -216,6 +219,7 @@ function Update-ItemList {
         $isSystem = $it.Type -in @('WindowsIso', 'LinuxIso')
         [void]$lvi.SubItems.Add($(if ($isSystem) { (T 'UsageSystem') } elseif ($mode -eq 'Manuel') { (T 'UsageManual') } else { (T 'UsageAuto') }))
         [void]$lvi.SubItems.Add([string]$it.Type)
+        [void]$lvi.SubItems.Add((Get-ItemCompat -Item $it -Systeme $p.Systeme))
         $lvi.Checked = -not ($it.ContainsKey('Default') -and -not $it.Default)
         $lvi.Tag = $it
         $lvi.ImageKey = $(if ($isSystem) { 'system' } elseif ($mode -eq 'Manuel') { 'tool' } else { 'package' })
@@ -224,6 +228,39 @@ function Update-ItemList {
     $script:ItemList.EndUpdate()
     Update-Total
     Update-DriveList
+}
+
+function Get-ItemCompat {
+    <#
+    .SYNOPSIS
+        Versions de Windows compatibles avec un élément (colonne « Windows » de la liste).
+    #>
+    param([hashtable] $Item, [string] $Systeme)
+    if ($Systeme -ne 'Windows' -or $Item.Type -eq 'LinuxIso') { return '' }
+    if ($Item.Type -eq 'WindowsIso') { return [string]$Item['FidoWin'] }
+    $c = @('11', '10'); if ($Item.ContainsKey('Compat')) { $c = @($Item.Compat) }
+    return ($c -join ' · ')
+}
+
+function Set-Win7Pack {
+    <#
+    .SYNOPSIS
+        Coche les éléments du pack de compatibilité Windows 7 (quand une ISO de Windows 7 est ajoutée).
+    #>
+    $n = 0
+    foreach ($i in $script:ItemList.Items) {
+        if ($i.Tag -is [hashtable] -and $i.Tag.ContainsKey('Compat') -and @($i.Tag.Compat) -contains '7' -and -not $i.Checked) { $i.Checked = $true; $n++ }
+    }
+    return $n
+}
+
+function Update-PersonalIso {
+    <#
+    .SYNOPSIS
+        Affiche les images personnelles choisies (nom des fichiers).
+    #>
+    $script:IsoPersoBox.Text = (@($script:PersonalIsos | ForEach-Object { Split-Path -Leaf $_ }) -join ' ; ')
+    $script:BtnIsoPersoClear.Enabled = ($script:PersonalIsos.Count -gt 0)
 }
 
 function Update-Total {
@@ -250,7 +287,7 @@ function Set-Running {
         Bascule l'interface en mode « exécution en cours » ou « prête ».
     #>
     param([bool] $Running)
-    foreach ($c in @($script:BtnSimulate, $script:BtnBuild, $script:SystemCombo, $script:UsageCombo, $script:DriveCombo, $script:ItemList, $script:BtnRefresh)) { $c.Enabled = -not $Running }
+    foreach ($c in @($script:BtnSimulate, $script:BtnBuild, $script:SystemCombo, $script:UsageCombo, $script:DriveCombo, $script:ItemList, $script:BtnRefresh, $btnIsoPerso)) { $c.Enabled = -not $Running }
     $script:BtnStop.Enabled = $Running
     if ($Running) { $script:Progress.Style = 'Marquee' } else { $script:Progress.Style = 'Blocks'; $script:Progress.Value = 0 }
 }
@@ -303,6 +340,8 @@ function Start-Build {
         if ($script:ChkBackupFull.Checked) { $argList += '-SauvegardeComplete' }
     }
     if ($script:IsoUrl.Text.Trim()) { $argList += @('-WindowsIsoUrl', ('"{0}"' -f $script:IsoUrl.Text.Trim())) }
+    # Images personnelles : séparateur « | » (interdit dans un chemin Windows, contrairement à la virgule)
+    if (@($script:PersonalIsos).Count -gt 0) { $argList += @('-IsoPersonnelle', ('"{0}"' -f ($script:PersonalIsos -join '|'))) }
 
     $hostExe = (Get-Process -Id $PID).Path
     $sp = @{ FilePath = $hostExe; ArgumentList = $argList; WindowStyle = 'Hidden'; PassThru = $true }
@@ -405,34 +444,44 @@ $script:ItemList = New-Object System.Windows.Forms.ListView
 $script:ItemList.View = 'Details'; $script:ItemList.CheckBoxes = $true; $script:ItemList.FullRowSelect = $true
 $script:ItemList.SmallImageList = New-KitStateImageList -Size 20
 $script:ItemList.BorderStyle = 'FixedSingle'
-$script:ItemList.Location = New-Object System.Drawing.Point(18, 182); $script:ItemList.Size = New-Object System.Drawing.Size(640, 250)
+$script:ItemList.Location = New-Object System.Drawing.Point(18, 182); $script:ItemList.Size = New-Object System.Drawing.Size(640, 330)
 $script:ItemList.Anchor = 'Top,Left,Bottom'
-[void]$script:ItemList.Columns.Add((T 'ColItem'), 200)
-[void]$script:ItemList.Columns.Add((T 'ColSize'), 80)
-[void]$script:ItemList.Columns.Add((T 'ColUsage'), 190)
-[void]$script:ItemList.Columns.Add((T 'ColSource'), 110)
-$script:ItemList.Add_ItemChecked({ Update-Total })
+[void]$script:ItemList.Columns.Add((T 'ColItem'), 185)
+[void]$script:ItemList.Columns.Add((T 'ColSize'), 75)
+[void]$script:ItemList.Columns.Add((T 'ColUsage'), 165)
+[void]$script:ItemList.Columns.Add((T 'ColSource'), 95)
+[void]$script:ItemList.Columns.Add((T 'ColWindows'), 85)
+$script:ItemList.Add_ItemChecked({
+        param($s, $e)
+        [void]$s
+        Update-Total
+        # Conseil contextuel : compatibilité des logiciels avec le système coché
+        if ($e.Item.Checked -and $e.Item.Tag -is [hashtable] -and $script:Hint) {
+            if ($e.Item.Tag.Name -eq 'Windows10') { $script:Hint.Text = (T 'Win10Hint') }
+            elseif ($e.Item.Tag.ContainsKey('Compat') -and @($e.Item.Tag.Compat) -contains '7') { $script:Hint.Text = (T 'Win7Hint') }
+        }
+    })
 $form.Controls.Add($script:ItemList)
 
 $btnAll = New-Object System.Windows.Forms.Button
-$btnAll.Text = (T 'CheckAll'); $btnAll.Location = New-Object System.Drawing.Point(18, 438); $btnAll.Size = New-Object System.Drawing.Size(125, 28); $btnAll.Anchor = 'Bottom,Left'
+$btnAll.Text = (T 'CheckAll'); $btnAll.Location = New-Object System.Drawing.Point(18, 518); $btnAll.Size = New-Object System.Drawing.Size(125, 28); $btnAll.Anchor = 'Bottom,Left'
 $btnAll.Add_Click({ foreach ($i in $script:ItemList.Items) { $i.Checked = $true } })
 $form.Controls.Add($btnAll)
 $btnNone = New-Object System.Windows.Forms.Button
-$btnNone.Text = (T 'CheckNone'); $btnNone.Location = New-Object System.Drawing.Point(149, 438); $btnNone.Size = New-Object System.Drawing.Size(120, 28); $btnNone.Anchor = 'Bottom,Left'
+$btnNone.Text = (T 'CheckNone'); $btnNone.Location = New-Object System.Drawing.Point(149, 518); $btnNone.Size = New-Object System.Drawing.Size(120, 28); $btnNone.Anchor = 'Bottom,Left'
 $btnNone.Add_Click({ foreach ($i in $script:ItemList.Items) { $i.Checked = $false } })
 $form.Controls.Add($btnNone)
-$script:TotalLabel = New-Label -Text '' -X 278 -Y 443 -W 390
+$script:TotalLabel = New-Label -Text '' -X 278 -Y 523 -W 390
 $script:TotalLabel.Anchor = 'Bottom,Left'
 $form.Controls.Add($script:TotalLabel)
-$script:Hint = New-Label -Text (T 'FreeSuiteHint') -X 18 -Y 466 -W 640
+$script:Hint = New-Label -Text (T 'FreeSuiteHint') -X 18 -Y 548 -W 640
 $script:Hint.ForeColor = $theme.Success
 $script:Hint.Anchor = 'Bottom,Left'
 $form.Controls.Add($script:Hint)
 
 # Options
 $grp = New-Object System.Windows.Forms.GroupBox
-$grp.Text = (T 'Options'); $grp.Location = New-Object System.Drawing.Point(672, 182); $grp.Size = New-Object System.Drawing.Size(430, 300)
+$grp.Text = (T 'Options'); $grp.Location = New-Object System.Drawing.Point(672, 182); $grp.Size = New-Object System.Drawing.Size(430, 380)
 $grp.Anchor = 'Top,Left,Right'
 $form.Controls.Add($grp)
 $script:ChkSignature = New-Object System.Windows.Forms.CheckBox
@@ -471,19 +520,54 @@ $lnkIso.Add_LinkClicked({ Start-Process 'https://www.microsoft.com/fr-fr/softwar
 $grp.Controls.Add($lnkIso)
 $grp.Controls.Add((New-Label -Text (T 'Tip') -X 14 -Y 260 -W 410 -H 36))
 
+# Autres versions de Windows : Windows 10 (officiel, dans la liste) et images personnelles (Windows 7…)
+$grp.Controls.Add((New-Label -Text (T 'OtherWindows') -X 14 -Y 300 -W 410))
+$lnkWin10 = New-Object System.Windows.Forms.LinkLabel
+$lnkWin10.Text = (T 'Win10Link')
+$lnkWin10.Location = New-Object System.Drawing.Point(14, 322); $lnkWin10.Size = New-Object System.Drawing.Size(410, 20)
+$lnkWin10.Add_LinkClicked({ Start-Process (T 'Win10Url') })
+$grp.Controls.Add($lnkWin10)
+$script:PersonalIsos = @()
+$btnIsoPerso = New-Object System.Windows.Forms.Button
+$btnIsoPerso.Text = (T 'IsoPerso'); $btnIsoPerso.Location = New-Object System.Drawing.Point(14, 344); $btnIsoPerso.Size = New-Object System.Drawing.Size(200, 28)
+$btnIsoPerso.Add_Click({
+        $dlg = New-Object System.Windows.Forms.OpenFileDialog
+        $dlg.Title = (T 'IsoPersoDialog'); $dlg.Multiselect = $true
+        $dlg.Filter = 'Images (*.iso;*.img;*.wim;*.vhd;*.vhdx)|*.iso;*.img;*.wim;*.vhd;*.vhdx'
+        if ($dlg.ShowDialog() -ne 'OK') { return }
+        $script:PersonalIsos = @(@($script:PersonalIsos) + @($dlg.FileNames) | Select-Object -Unique)
+        Update-PersonalIso
+        # ISO de Windows 7 : on propose (coche) les logiciels compatibles
+        if (@($dlg.FileNames | Where-Object { (Split-Path -Leaf $_) -match '(?i)(win(dows)?[ _.-]?7|\bw7\b|seven)' }).Count -gt 0) {
+            $n = Set-Win7Pack
+            $script:Hint.Text = (T 'Win7Hint')
+            if ($n -gt 0) { [void][System.Windows.Forms.MessageBox]::Show(((T 'Win7PackChecked') -f $n), 'Alchemist', 'OK', 'Information') }
+        }
+    })
+$grp.Controls.Add($btnIsoPerso)
+$script:IsoPersoBox = New-Object System.Windows.Forms.TextBox
+$script:IsoPersoBox.ReadOnly = $true
+$script:IsoPersoBox.Location = New-Object System.Drawing.Point(220, 347); $script:IsoPersoBox.Size = New-Object System.Drawing.Size(168, 24)
+$grp.Controls.Add($script:IsoPersoBox)
+$script:BtnIsoPersoClear = New-Object System.Windows.Forms.Button
+$script:BtnIsoPersoClear.Text = 'X'; $script:BtnIsoPersoClear.Enabled = $false
+$script:BtnIsoPersoClear.Location = New-Object System.Drawing.Point(392, 345); $script:BtnIsoPersoClear.Size = New-Object System.Drawing.Size(28, 26)
+$script:BtnIsoPersoClear.Add_Click({ $script:PersonalIsos = @(); Update-PersonalIso })
+$grp.Controls.Add($script:BtnIsoPersoClear)
+
 # Boutons d'action
 $script:BtnSimulate = New-Object System.Windows.Forms.Button
-$script:BtnSimulate.Text = (T 'Simulate'); $script:BtnSimulate.Location = New-Object System.Drawing.Point(18, 492); $script:BtnSimulate.Size = New-Object System.Drawing.Size(205, 36)
+$script:BtnSimulate.Text = (T 'Simulate'); $script:BtnSimulate.Location = New-Object System.Drawing.Point(18, 572); $script:BtnSimulate.Size = New-Object System.Drawing.Size(205, 36)
 $script:BtnSimulate.Anchor = 'Bottom,Left'
 $script:BtnSimulate.Add_Click({ Start-Build -Simulation $true })
 $form.Controls.Add($script:BtnSimulate)
 $script:BtnBuild = New-Object System.Windows.Forms.Button
-$script:BtnBuild.Text = (T 'Build'); $script:BtnBuild.Location = New-Object System.Drawing.Point(231, 492); $script:BtnBuild.Size = New-Object System.Drawing.Size(240, 36)
+$script:BtnBuild.Text = (T 'Build'); $script:BtnBuild.Location = New-Object System.Drawing.Point(231, 572); $script:BtnBuild.Size = New-Object System.Drawing.Size(240, 36)
 $script:BtnBuild.Anchor = 'Bottom,Left'
 $script:BtnBuild.Add_Click({ Start-Build -Simulation $false })
 $form.Controls.Add($script:BtnBuild)
 $script:BtnStop = New-Object System.Windows.Forms.Button
-$script:BtnStop.Text = (T 'Stop'); $script:BtnStop.Enabled = $false; $script:BtnStop.Location = New-Object System.Drawing.Point(479, 492); $script:BtnStop.Size = New-Object System.Drawing.Size(105, 36)
+$script:BtnStop.Text = (T 'Stop'); $script:BtnStop.Enabled = $false; $script:BtnStop.Location = New-Object System.Drawing.Point(479, 572); $script:BtnStop.Size = New-Object System.Drawing.Size(105, 36)
 $script:BtnStop.Anchor = 'Bottom,Left'
 $script:BtnStop.Add_Click({
         if ($script:Process -and -not $script:Process.HasExited) {
@@ -494,12 +578,12 @@ $script:BtnStop.Add_Click({
     })
 $form.Controls.Add($script:BtnStop)
 $btnLogs = New-Object System.Windows.Forms.Button
-$btnLogs.Text = (T 'Logs'); $btnLogs.Location = New-Object System.Drawing.Point(592, 492); $btnLogs.Size = New-Object System.Drawing.Size(115, 36)
+$btnLogs.Text = (T 'Logs'); $btnLogs.Location = New-Object System.Drawing.Point(592, 572); $btnLogs.Size = New-Object System.Drawing.Size(115, 36)
 $btnLogs.Anchor = 'Bottom,Left'
 $btnLogs.Add_Click({ $d = Join-Path $kitRoot 'logs'; if (-not (Test-Path $d)) { New-Item -ItemType Directory $d | Out-Null }; Start-Process explorer.exe $d })
 $form.Controls.Add($btnLogs)
 $script:Progress = New-Object System.Windows.Forms.ProgressBar
-$script:Progress.Location = New-Object System.Drawing.Point(717, 499); $script:Progress.Size = New-Object System.Drawing.Size(385, 22)
+$script:Progress.Location = New-Object System.Drawing.Point(717, 579); $script:Progress.Size = New-Object System.Drawing.Size(385, 22)
 $script:Progress.Anchor = 'Bottom,Left,Right'
 $form.Controls.Add($script:Progress)
 
@@ -507,7 +591,7 @@ $form.Controls.Add($script:Progress)
 $script:LogBox = New-Object System.Windows.Forms.RichTextBox
 $script:LogBox.ReadOnly = $true; $script:LogBox.BackColor = [System.Drawing.Color]::FromArgb(30, 30, 30)
 $script:LogBox.ForeColor = [System.Drawing.Color]::Gainsboro; $script:LogBox.Font = New-Object System.Drawing.Font('Consolas', 9)
-$script:LogBox.Location = New-Object System.Drawing.Point(18, 534); $script:LogBox.Size = New-Object System.Drawing.Size(1084, 190)
+$script:LogBox.Location = New-Object System.Drawing.Point(18, 614); $script:LogBox.Size = New-Object System.Drawing.Size(1084, 110)
 $script:LogBox.Anchor = 'Bottom,Left,Right'; $script:LogBox.WordWrap = $false
 $form.Controls.Add($script:LogBox)
 $statusStrip = New-Object System.Windows.Forms.StatusStrip
@@ -558,6 +642,7 @@ Set-KitButtonStyle -Button $script:BtnStop -Kind Danger -Glyph 'Stop'
 Set-KitButtonStyle -Button $btnLogs -Kind Secondary -Glyph 'Folder'
 Set-KitButtonStyle -Button $script:BtnRefresh -Kind Secondary -Glyph 'Refresh'
 Set-KitButtonStyle -Button $btnBrowse -Kind Secondary -Glyph 'Folder'
+Set-KitButtonStyle -Button $btnIsoPerso -Kind Secondary -Glyph 'Folder'
 Set-KitButtonStyle -Button $btnAll -Kind Secondary -Glyph 'Check'
 Set-KitButtonStyle -Button $btnNone -Kind Secondary
 $grp.ForeColor = $theme.Accent

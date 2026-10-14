@@ -30,6 +30,18 @@ jobs:
           }
           if ($bad) { throw "$bad fichier(s) en erreur de syntaxe" }
 
+      - name: Assistant Windows construit sans erreur (FR et EN, avec capture)
+        shell: powershell
+        run: |
+          .\Assistant.ps1 -TestSansAffichage -Capture "$env:RUNNER_TEMP\assistant-fr.png"
+          .\Assistant.ps1 -TestSansAffichage -Interface en -Capture "$env:RUNNER_TEMP\assistant-en.png"
+
+      - name: Captures de l'assistant
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: captures-assistant
+          path: ${{ runner.temp }}/assistant-*.png
+
       - name: Scripts Linux en LF malgré une copie Windows (.gitattributes)
         shell: pwsh
         run: |

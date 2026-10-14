@@ -36,6 +36,23 @@ la [gestion sémantique de version](https://semver.org/lang/fr/) (`MAJEUR.MINEUR
 
 ### Ajouté
 
+- **Windows 10 22H2** (dernière version, ISO officielle Microsoft via Fido) proposé dans « Systèmes
+  supplémentaires », décoché par défaut, pour les PC incompatibles avec Windows 11. Tous les logiciels de la clé
+  et la post-installation fonctionnent aussi sous Windows 10 ; installation hors ligne Ventoy avec le même modèle.
+  Lien vers la page officielle Microsoft sur l'écran de préparation ; un lien `-WindowsIsoUrl` collé à la main
+  est attribué à la bonne version de Windows (`Win10_…` / `Win11_…`).
+- **Images personnelles** (bouton « ISO personnelle… », `-IsoPersonnelle`) : Windows 7, 8.1 sous licence ou tout
+  autre système copié dans `ISO/Personnel/`, avec vérification SHA256 de la copie ; jamais supprimé par le kit.
+  Microsoft ne distribue plus Windows 7 : le kit ne propose aucune source non officielle.
+- **Pack de compatibilité Windows 7** (dernières versions officielles encore compatibles) : .NET Framework 4.8,
+  WMF 5.1 / PowerShell 5.1 (empreinte SHA256 fixée), Firefox ESR 115. Coché automatiquement quand une ISO de
+  Windows 7 est ajoutée ; `Lancer.bat` détecte Windows 7/8.1 et ouvre ce pack avec son mode d'emploi
+  (`postinstall\Windows7.txt`) au lieu d'échouer.
+- Colonne « Windows » dans la liste : versions de Windows compatibles avec chaque logiciel ; conseil contextuel
+  quand Windows 10 ou le pack Windows 7 est coché.
+- Profils : champ `Compat` (versions de Windows prises en charge) et `Sha256` dans `Files` (fichier officiel figé
+  et non signé).
+- CI : l'assistant Windows est construit en FR et EN à chaque commit, captures publiées en artefact.
 - Une seule préparation à la fois sur un poste (assistant ouvert deux fois, assistant et ligne de commande) :
   la seconde s'arrête avec un message au lieu d'écrire les mêmes fichiers de la clé en parallèle.
 - Windows : mise en veille suspendue pendant la préparation (l'écran peut s'éteindre).
