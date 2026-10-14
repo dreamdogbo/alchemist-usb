@@ -5,6 +5,12 @@
       "template": [
         "/ventoy/script/Windows11_HorsLigne.xml"
       ]
+    },
+    {
+      "image": "/ISO/{{ISO_NAME_W10}}",
+      "template": [
+        "/ventoy/script/Windows11_HorsLigne.xml"
+      ]
     }
   ]
 }

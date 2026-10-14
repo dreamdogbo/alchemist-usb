@@ -817,7 +817,7 @@ function Get-KitWindowsIsoUrl {
         $last = ($out | Select-Object -Last 3) -join ' | '
         if ($attempt -lt $script:MaxAttempts) { Start-Sleep -Seconds (10 * $attempt) }
     }
-    throw ("Fido n'a pas pu obtenir le lien officiel de l'ISO ({0}). Microsoft bloque parfois les requêtes automatisées (erreur 715-123130) : téléchargez l'ISO à la main depuis https://www.microsoft.com/fr-fr/software-download/windows11 , placez-la dans cache\Windows11\Windows11_FR_x64.iso puis relancez avec -SkipDownload." -f $last)
+    throw ("Fido n'a pas pu obtenir le lien officiel de l'ISO ({0}). Microsoft bloque parfois les requêtes automatisées (erreur 715-123130) : téléchargez l'ISO à la main depuis https://www.microsoft.com/fr-fr/software-download/windows{1} et collez le lien dans l'assistant (« Lien de l'ISO »), ou placez-la dans le cache sous le nom {2} puis relancez avec -SkipDownload." -f $last, $(if ([string]$Item.FidoWin -eq '10') { '10ISO' } else { '11' }), $Item.FileName)
 }
 
 function Get-KitOfficeVersion {
@@ -919,7 +919,7 @@ function Resolve-KitPlan {
             foreach ($f in @($item.Files)) {
                 $ri = Get-KitRemoteInfo -Url $f.Url
                 $name = Get-KitValue $f 'FileName' $ri.FileName
-                $files += [pscustomobject]@{ Url = $f.Url; FinalUrl = $ri.FinalUrl; Length = $ri.Length; LastModified = $ri.LastModified; FileName = $name }
+                $files += [pscustomobject]@{ Url = $f.Url; FinalUrl = $ri.FinalUrl; Length = $ri.Length; LastModified = $ri.LastModified; FileName = $name; Sha256 = [string](Get-KitValue $f 'Sha256' '') }
             }
             $Plan.Source = $files
             $total = 0.0; $known = $true
@@ -962,7 +962,12 @@ function Resolve-KitPlan {
             }
         }
         'WindowsIso' {
-            if ($WindowsIsoUrl) {
+            # Le lien manuel ne vaut que pour SA version de Windows : les noms Microsoft commencent par
+            # « Win10_ » / « Win11_ » ; un nom illisible est attribué à l'ISO principale (Windows 11)
+            $manualFor = ''
+            if ($WindowsIsoUrl -and (([uri]$WindowsIsoUrl).AbsolutePath -match '/Win(\d+)_')) { $manualFor = $Matches[1] }
+            $useManual = [bool]$WindowsIsoUrl -and (($manualFor -and $manualFor -eq [string]$item.FidoWin) -or (-not $manualFor -and [int](Get-KitValue $item 'Priority' 9) -le 1))
+            if ($useManual) {
                 # Lien officiel fourni par l'opérateur (Fido bloqué) : domaine Microsoft obligatoire
                 $hostName = ([uri]$WindowsIsoUrl).Host
                 if ($hostName -notmatch '(^|\.)microsoft\.com$') { throw "-WindowsIsoUrl doit pointer vers un domaine microsoft.com (reçu : $hostName)." }
@@ -1204,7 +1209,12 @@ function Save-KitUrlItem {
     foreach ($f in $Plan.Source) {
         $dest = Join-Path $StageDir $f.FileName
         Invoke-KitHttpDownload -Url $f.Url -Destination $dest -ExpectedLength $f.Length -SourceTag ("{0}|{1}|{2}" -f $f.FinalUrl, $f.Length, $f.LastModified)
-        $sigs += ("{0} : {1}" -f $f.FileName, (Test-KitSignature -Path $dest -Signer (Get-KitValue $item 'Signer' '') -Required))
+        if ($f.Sha256) {
+            # Fichier officiel figé et non signé : l'empreinte fixée dans le profil fait foi
+            if ((Get-KitSha256 -Path $dest) -ne $f.Sha256.ToLowerInvariant()) { Remove-Item -LiteralPath $dest -Force; throw "$($f.FileName) : SHA256 différent de l'empreinte attendue. Fichier refusé." }
+            $sigs += ("{0} : SHA256 conforme à l'empreinte fixée" -f $f.FileName)
+        }
+        else { $sigs += ("{0} : {1}" -f $f.FileName, (Test-KitSignature -Path $dest -Signer (Get-KitValue $item 'Signer' '') -Required)) }
         $files += @{ Name = $f.FileName; Sha256 = (Get-KitSha256 -Path $dest); Length = (Get-Item -LiteralPath $dest).Length; Url = $f.Url; FinalUrl = $f.FinalUrl; LastModified = $f.LastModified }
     }
     $installer = Get-KitValue $item 'Installer' $files[0].Name

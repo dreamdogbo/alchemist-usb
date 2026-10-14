@@ -5,7 +5,11 @@
 
 CONTENU DE LA CLÉ
   ISO\{{ISO_NAME}}            Windows 11 officiel (64 bits)
+  ISO\Windows10_*.iso         Windows 10 22H2 officiel (si ajouté à la création)
   ISO\Linux\...               Systèmes Linux (si ajoutés à la création)
+  ISO\Personnel\              Vos propres images (Windows 7, 8.1…), si ajoutées
+  Windows7\                   Pack de compatibilité Windows 7 (si ajouté) :
+                              voir postinstall\Windows7.txt
   Bureautique\                Microsoft 365 Apps et/ou LibreOffice / ONLYOFFICE
   Logiciels\                  Navigateurs, PDF, multimédia, utilitaires, outils
   postinstall\Lancer.bat      Installe les logiciels après Windows (fenêtre)
@@ -16,8 +20,9 @@ CONTENU DE LA CLÉ
   1. Brancher la clé, allumer le PC, ouvrir le menu de démarrage
      (touche F12, F11, F9, F8 ou Échap selon la marque).
   2. Choisir la clé USB : le menu Ventoy s'affiche avec tous les systèmes.
-  3. Choisir l'ISO Windows 11, puis le modèle « Windows11_HorsLigne.xml »
-     (recommandé : compte LOCAL sans Internet).
+  3. Choisir l'ISO Windows 11 (ou Windows 10), puis le modèle
+     « Windows11_HorsLigne.xml » (recommandé : compte LOCAL sans Internet).
+     Windows 7 : voir postinstall\Windows7.txt (mode Legacy/CSM du BIOS).
   4. Clé de produit : saisir la clé fournie, ou « Je n'ai pas de clé de produit »
      (les PC déjà sous licence s'activent seuls plus tard). Édition PRO conseillée.
   5. Installation « Personnalisée » : CHOISIR LE BON DISQUE.

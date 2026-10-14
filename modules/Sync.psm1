@@ -233,6 +233,9 @@ function New-KitCatalogue {
     )
     $entries = foreach ($item in $Items) {
         if ($item.Type -in @('WindowsIso', 'LinuxIso')) { continue }
+        # Pack de compatibilité Windows 7 : pas pour la post-installation de Windows 10/11
+        $compat = @(Get-KitValue $item 'Compat' @('11', '10'))
+        if ($compat -notcontains '11' -and $compat -notcontains '10') { continue }
         $src = Get-KitKeySource -KeyRoot $KeyRoot -Item $item
         $installer = $null
         if ($item.Type -eq 'Office') {
@@ -281,5 +284,60 @@ function New-KitCatalogue {
     return $Destination
 }
 
-Export-ModuleMember -Function ConvertTo-KitRelPath, ConvertTo-KitLocalPath, Read-KitManifest, Write-KitManifest, Get-KitManagedSize,
+function Copy-KitPersonalIso {
+    <#
+    .SYNOPSIS
+        Copie sur la clé une image fournie par l'utilisateur (ISO Windows 7 / 8.1 sous licence,
+        image d'un éditeur…) dans ISO/Personnel/, avec vérification SHA256 de la copie.
+    .DESCRIPTION
+        Le fichier n'est PAS inscrit au MANIFEST : c'est un fichier personnel, que le kit ne
+        modifiera ni ne supprimera jamais. Une image déjà présente avec la même taille est conservée.
+        Formats acceptés par Ventoy : .iso .img .wim .vhd .vhdx .efi
+    .OUTPUTS
+        Objet : Name, Status (OK | À JOUR | ÉCHEC | SIMULATION), Detail, Bytes.
+    #>
+    [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([pscustomobject])]
+    param(
+        [Parameter(Mandatory)] [string] $Path,
+        [Parameter(Mandatory)] [string] $KeyRoot,
+        [string] $FileSystem = '',
+        [double] $MarginBytes = 0,
+        [switch] $DryRun
+    )
+    $name = Split-Path -Leaf $Path
+    $result = { param($s, $d, $b) [pscustomobject]@{ Name = $name; Status = $s; Detail = $d; Bytes = [double]$b } }
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { return (& $result 'ÉCHEC' "fichier introuvable : $Path" 0) }
+    if ([IO.Path]::GetExtension($name).ToLowerInvariant() -notin @('.iso', '.img', '.wim', '.vhd', '.vhdx', '.efi')) {
+        return (& $result 'ÉCHEC' 'format non pris en charge par Ventoy (attendu : .iso .img .wim .vhd .vhdx .efi)' 0)
+    }
+    $src = Get-Item -LiteralPath $Path
+    $size = [double]$src.Length
+    if ($FileSystem -match 'FAT32|^vfat$' -and $size -ge 4GB) { return (& $result 'ÉCHEC' 'clé en FAT32 : fichiers de 4 Go maximum (réinstallez Ventoy en exFAT)' $size) }
+    $destDir = Join-Path $KeyRoot 'ISO/Personnel'
+    $dest = Join-Path $destDir $name
+    if ((Test-Path -LiteralPath $dest) -and [double](Get-Item -LiteralPath $dest).Length -eq $size) {
+        return (& $result 'À JOUR' ("déjà sur la clé (ISO/Personnel/{0})" -f $name) $size)
+    }
+    $free = Get-KitFreeSpace -Root $KeyRoot
+    if ($size -gt ($free - $MarginBytes)) { return (& $result 'ÉCHEC' ("place insuffisante : {0} nécessaires, {1} libres (marge {2})" -f (Format-KitSize $size), (Format-KitSize $free), (Format-KitSize $MarginBytes)) $size) }
+    if ($DryRun) { return (& $result 'SIMULATION' ("serait copiée dans ISO/Personnel ({0})" -f (Format-KitSize $size)) $size) }
+    if (-not $PSCmdlet.ShouldProcess($dest, 'Copie de l''image personnelle')) { return (& $result 'SIMULATION' 'non copiée (-WhatIf)' $size) }
+    if (-not (Test-Path -LiteralPath $destDir)) { New-Item -ItemType Directory -Path $destDir -Force | Out-Null }
+    Write-KitLog -Message ("{0} : copie sur la clé ({1})…" -f $name, (Format-KitSize $size))
+    $part = "$dest.part"
+    try {
+        Copy-Item -LiteralPath $Path -Destination $part -Force
+        if ((Get-KitSha256 -Path $part) -ne (Get-KitSha256 -Path $Path)) { throw 'la copie ne correspond pas à l''original (SHA256)' }
+        if (Test-Path -LiteralPath $dest) { Remove-Item -LiteralPath $dest -Force }
+        Move-Item -LiteralPath $part -Destination $dest
+    }
+    catch {
+        Remove-Item -LiteralPath $part -Force -ErrorAction SilentlyContinue
+        return (& $result 'ÉCHEC' $_.Exception.Message $size)
+    }
+    return (& $result 'OK' ("copiée et vérifiée (SHA256) dans ISO/Personnel ({0})" -f (Format-KitSize $size)) $size)
+}
+
+Export-ModuleMember -Function Copy-KitPersonalIso, ConvertTo-KitRelPath, ConvertTo-KitLocalPath, Read-KitManifest, Write-KitManifest, Get-KitManagedSize,
     Remove-KitEmptyDirectory, Sync-KitStage, New-KitCatalogue

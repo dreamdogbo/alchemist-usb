@@ -59,6 +59,9 @@
 .PARAMETER WindowsIsoUrl
     Lien de téléchargement officiel Microsoft de l'ISO (domaine microsoft.com obligatoire),
     à utiliser quand Microsoft bloque Fido (erreur « 715-123130 » / « Sentinel »).
+.PARAMETER IsoPersonnelle
+    Images fournies par l'utilisateur (ISO Windows 7 / 8.1 sous licence, autre système…) copiées
+    dans ISO/Personnel/ de la clé, avec vérification SHA256. Fichiers personnels : jamais supprimés.
 .PARAMETER CachePath
     Dossier de préparation (défaut : cache\ à côté de ce script). Sur le même volume que la
     clé, la mise en place est un simple déplacement.
@@ -116,6 +119,7 @@ param(
     [string] $SauvegardeVers,
     [switch] $SauvegardeComplete,
     [string] $WindowsIsoUrl,
+    [string[]] $IsoPersonnelle,
     [string] $CachePath,
     [string] $LogFile,
     [switch] $InstallerVentoy,
@@ -401,7 +405,8 @@ try {
     }
 
     # Windows 11 et Office sont essentiels : sans source officielle, on s'arrête (hors DryRun)
-    $critical = @($plans | Where-Object { $_.Status -eq 'INTROUVABLE' -and $_.Item.Type -in @('WindowsIso', 'Office') })
+    # (un système facultatif, comme Windows 10, n'arrête pas la préparation : il est simplement en ÉCHEC)
+    $critical = @($plans | Where-Object { $_.Status -eq 'INTROUVABLE' -and $_.Item.Type -in @('WindowsIso', 'Office') -and -not ($_.Item.ContainsKey('Default') -and -not $_.Item.Default) })
     if ($critical.Count -gt 0 -and -not $DryRun) {
         foreach ($c in $plans) {
             if ($c.Status -eq 'INTROUVABLE') { Add-KitResult -Name $c.Name -Status 'ÉCHEC' -Detail $c.Detail }
@@ -427,6 +432,17 @@ try {
     $plans = Select-KitBudget -Plans $plans -FreeBytes (Get-KitFreeSpace -Root $keyRoot) -MarginBytes $marginBytes
     Show-KitBudget -Plans $plans -FreeBytes (Get-KitFreeSpace -Root $keyRoot) -MarginBytes $marginBytes
 
+    # Images personnelles (Windows 7, 8.1…) : copiées après les éléments du profil
+    # (séparateur « | » depuis l'assistant ; un tableau PowerShell est aussi accepté)
+    $personalIsos = @($IsoPersonnelle | ForEach-Object { $_ -split '\|' } | ForEach-Object { $_.Trim().Trim('"') } | Where-Object { $_ })
+    $addPersonal = {
+        foreach ($iso in $personalIsos) {
+            $r = Copy-KitPersonalIso -Path $iso -KeyRoot $keyRoot -FileSystem $drive.FileSystem -MarginBytes $marginBytes -DryRun:$DryRun
+            $st = $(if ($r.Status -eq 'ÉCHEC') { 'ÉCHEC' } else { 'OK' })
+            Add-KitResult -Name ("ISO perso {0}" -f $r.Name) -Status $st -Detail $r.Detail -SizeMB ($r.Bytes / 1MB)
+        }
+    }
+
     if ($DryRun) {
         foreach ($p in $plans) {
             switch ($p.Decision) {
@@ -440,6 +456,7 @@ try {
                 default  { Add-KitResult -Name $p.Name -Status 'IGNORÉ' -Detail $p.Detail -SizeMB ($p.NewBytes / 1MB) }
             }
         }
+        & $addPersonal
         $freeAfter = Get-KitFreeSpace -Root $keyRoot
         $exitCode = Show-KitReport -FreeBeforeBytes $freeBefore -FreeAfterBytes $freeAfter -DryRun
         exit $exitCode
@@ -495,6 +512,11 @@ try {
         }
     }
 
+    if ($personalIsos.Count -gt 0) {
+        Write-KitLog -Level STEP -Message '--- Images personnelles'
+        & $addPersonal
+    }
+
     # ------------------------------------------------------------------ 6. post-installation, LISEZMOI, Ventoy
     Write-KitLog -Level STEP -Message '4. Post-installation, catalogue, LISEZMOI, modèle Ventoy'
     try {
@@ -523,9 +545,11 @@ try {
         }
 
         # Jetons des modèles (nom de l'ISO, langue, clavier, fuseau) remplacés dans les fichiers texte
-        $isoItem = @($allItems | Where-Object { $_.Type -eq 'WindowsIso' }) | Select-Object -First 1
+        $isoItem = @($allItems | Where-Object { $_.Type -eq 'WindowsIso' -and [string]$_['FidoWin'] -ne '10' }) | Select-Object -First 1
+        $iso10Item = @($allItems | Where-Object { $_.Type -eq 'WindowsIso' -and [string]$_['FidoWin'] -eq '10' }) | Select-Object -First 1
         $tokens = @{
             '{{ISO_NAME}}'     = $(if ($isoItem) { [string]$isoItem.FileName } else { '' })
+            '{{ISO_NAME_W10}}' = $(if ($iso10Item) { [string]$iso10Item.FileName } else { 'Windows10_x64.iso' })
             '{{UI_LANG}}'      = $(if ($langInfo) { $langInfo.UILang } else { 'fr-FR' })
             '{{INPUT_LOCALE}}' = $(if ($langInfo) { $langInfo.InputLocale } else { '040c:0000040c' })
             '{{TIMEZONE}}'     = $tz
@@ -533,7 +557,7 @@ try {
         }
         foreach ($tf in @(Get-ChildItem -LiteralPath $gen -Recurse -File -Include '*.xml', '*.json', '*.txt', '*.md')) {
             $content = [IO.File]::ReadAllText($tf.FullName)
-            if ($content -notmatch '\{\{[A-Z_]+\}\}') { continue }
+            if ($content -notmatch '\{\{[A-Z0-9_]+\}\}') { continue }
             foreach ($k in $tokens.Keys) { $content = $content.Replace($k, $tokens[$k]) }
             $bom = ($tf.Extension -eq '.txt')
             [IO.File]::WriteAllText($tf.FullName, $content, (New-Object Text.UTF8Encoding($bom)))
