@@ -178,7 +178,37 @@ $exitCode = 0
 $freeBefore = -1.0
 $freeAfter = -1.0
 $phase = 'init'
+$keyRoot = ''
 [void](Initialize-KitLog -LogDirectory (Join-Path $kitRoot 'logs') -LogFile $LogFile)
+
+# Une seule préparation à la fois sur ce poste : deux préparations simultanées (double-clic,
+# assistant + ligne de commande) écriraient les mêmes fichiers de la clé et la rendraient incohérente.
+# Une simulation n'écrit rien sur la clé : elle n'est pas concernée.
+$buildLock = $null
+if (-not $DryRun) {
+    try {
+        $buildLock = New-Object System.Threading.Mutex($false, 'Global\Alchemist-Build')
+        $acquired = $false
+        try { $acquired = $buildLock.WaitOne(0) } catch [System.Threading.AbandonedMutexException] { $acquired = $true }
+        if (-not $acquired) {
+            $buildLock.Dispose(); $buildLock = $null
+            Write-KitLog -Level ERROR -Message 'Une autre préparation de clé est déjà en cours sur ce poste. Attendez sa fin (ou arrêtez-la) avant d''en lancer une nouvelle.'
+            exit 2
+        }
+    }
+    catch {
+        # Accès refusé : verrou créé par une préparation lancée avec d'autres droits, donc détenu
+        $denied = $false
+        for ($ex = $_.Exception; $ex; $ex = $ex.InnerException) { if ($ex -is [System.UnauthorizedAccessException]) { $denied = $true } }
+        if ($denied) {
+            Write-KitLog -Level ERROR -Message 'Une autre préparation de clé est déjà en cours sur ce poste (lancée en administrateur). Attendez sa fin avant d''en lancer une nouvelle.'
+            exit 2
+        }
+        $buildLock = $null
+        Write-Verbose ('Verrou de préparation indisponible : {0}' -f $_.Exception.Message)
+    }
+    Set-KitKeepAwake -Enabled $true -Confirm:$false
+}
 
 try {
     Write-KitLog -Level STEP -Message ("Alchemist v{2} — {0}{1}" -f (Get-Date -Format 'dd/MM/yyyy HH:mm'), $(if ($DryRun) { ' — MODE SIMULATION' } else { '' }), $kitVersion)
@@ -262,7 +292,7 @@ try {
                 $SauvegardeVers = $null   # la clé sera vierge : rien d'autre à sauvegarder ensuite
             }
             $ventoy = Save-KitVentoy -ToolsDir (Join-Path ([IO.Path]::GetTempPath()) 'alchemist-ventoy')
-            Invoke-KitVentoy2Disk -Exe $ventoy.Exe -Mode Install -Disk $target.Id -Gpt:$VentoyGPT -NoSecureBoot:$VentoySansSecureBoot -FileSystem $VentoyFS -Label $config.VolumeLabel -Confirm:$false
+            Install-KitVentoy -Exe $ventoy.Exe -Disk $target.Id -Gpt:$VentoyGPT -NoSecureBoot:$VentoySansSecureBoot -FileSystem $VentoyFS -Label $config.VolumeLabel -Confirm:$false
             $installedRoot = Wait-KitVentoyVolume -Disk $target.Id -Label $config.VolumeLabel
             Add-KitResult -Name 'Ventoy' -Status 'OK' -Detail ("Ventoy {0} installé sur le disque {1} ({2})" -f $ventoy.Version, $target.Id, $installedRoot)
         }
@@ -347,8 +377,8 @@ try {
     if ($windowsOnly.Count -gt 0 -and -not (Test-KitWindows)) {
         throw ("Ces éléments se préparent depuis Windows (winget / Office Deployment Tool) : {0}. Depuis Linux, choisissez un profil Linux ou décochez-les." -f (($windowsOnly | ForEach-Object Name) -join ', '))
     }
-    if (-not $SkipDownload -and @($items | Where-Object { $_.Type -eq 'Winget' }).Count -gt 0 -and -not (Get-Command winget -ErrorAction SilentlyContinue)) {
-        throw "winget est introuvable. Installez « App Installer » depuis le Microsoft Store, ou utilisez -SkipDownload."
+    if (-not $SkipDownload -and @($items | Where-Object { $_.Type -eq 'Winget' }).Count -gt 0 -and -not (Initialize-KitWinget)) {
+        throw "winget est introuvable. Installez « App Installer » depuis le Microsoft Store (ou relancez l'assistant sans droits administrateur), ou utilisez -SkipDownload."
     }
     # ------------------------------------------------------------------ 2. sources
     $phase = 'resolve'
@@ -378,6 +408,18 @@ try {
         }
         $phase = 'critical'
         throw ("Source officielle introuvable pour : {0}. Arrêt avant toute écriture sur la clé." -f (($critical | ForEach-Object Name) -join ', '))
+    }
+
+    # Clé en FAT32 (ancienne clé, ou Ventoy installé avec /FS:FAT32) : aucun fichier de 4 Go ou plus.
+    # Sans ce contrôle, l'ISO de Windows échoue après de longues minutes de téléchargement.
+    if ($drive.FileSystem -match 'FAT32|^vfat$') {
+        foreach ($p in $plans) {
+            if ($p.Item.Type -in @('WindowsIso', 'LinuxIso') -and $p.NewBytes -ge 4GB -and $p.Status -notin @('A_JOUR', 'INTROUVABLE')) {
+                $p.Status = 'INTROUVABLE'
+                $p.Detail = ("La clé est en FAT32 (fichiers limités à 4 Go) : {0} ({1}) ne peut pas y être copié. Réinstallez Ventoy en exFAT (case « Clé neuve », efface la clé) ou utilisez une autre clé." -f $p.Name, (Format-KitSize $p.NewBytes))
+                Write-KitLog -Level ERROR -Message $p.Detail
+            }
+        }
     }
 
     # ------------------------------------------------------------------ 3. budget
@@ -516,6 +558,7 @@ try {
         Add-KitResult -Name 'Post-installation' -Status 'ÉCHEC' -Detail $_.Exception.Message
     }
 
+    Sync-KitVolume -Root $keyRoot
     $freeAfter = Get-KitFreeSpace -Root $keyRoot
     $exitCode = Show-KitReport -FreeBeforeBytes $freeBefore -FreeAfterBytes $freeAfter
 }
@@ -525,5 +568,12 @@ catch {
     if ($phase -eq 'critical') { $exitCode = 3 } else { $exitCode = 2 }
     try { if ($freeBefore -ge 0) { $freeAfter = Get-KitFreeSpace -Root $keyRoot } } catch { $freeAfter = -1 }
     [void](Show-KitReport -FreeBeforeBytes $freeBefore -FreeAfterBytes $freeAfter -DryRun:$DryRun)
+}
+finally {
+    if ($buildLock) {
+        Set-KitKeepAwake -Enabled $false -Confirm:$false
+        try { $buildLock.ReleaseMutex() } catch { Write-Verbose 'Verrou déjà libéré.' }
+        $buildLock.Dispose()
+    }
 }
 exit $exitCode

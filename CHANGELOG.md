@@ -7,6 +7,40 @@ la [gestion sémantique de version](https://semver.org/lang/fr/) (`MAJEUR.MINEUR
 
 ## [Non publié]
 
+### Corrigé
+
+- Windows : l'assistant ne se lançait pas, sans aucun message (PowerShell démarré sans fenêtre). Nouveau
+  lanceur `modules/Lanceur.ps1` : message clair et `logs\demarrage-*.log` si la fenêtre ne peut pas s'ouvrir
+  (archive ZIP non extraite, PowerShell en mode restreint AppLocker/WDAC), fichiers du kit débloqués
+  (marque « Internet »), un seul assistant ouvert à la fois. Dépannage : `Creer-Cle.bat -Console`.
+- Windows : fenêtre figée au démarrage et à « Actualiser » quand un lecteur réseau déconnecté, un lecteur de
+  CD ou un lecteur de cartes vide était présent : ces lecteurs ne sont plus interrogés.
+- Ancienne clé Ventoy non reconnue quand le libellé de sa partition n'était pas exactement « Ventoy »
+  (renommée, ou affichée « VENTOY » en FAT32) : la partition VTOYEFI du même disque suffit désormais.
+- Clé neuve : « Le volume n'est pas prêt » juste après l'installation de Ventoy ; le kit attend que Windows
+  ait monté la partition (jusqu'à 30 s) avant de la contrôler.
+- Clé neuve sur une ancienne clé (ISO écrite en mode DD, partitions verrouillées, table abîmée) : quand
+  Ventoy2Disk refuse le disque, la table de partitions est effacée puis l'installation est réessayée. Un
+  disque hors ligne ou en lecture seule est remis en état ; une clé verrouillée par son interrupteur est
+  signalée clairement.
+- Ventoy2Disk bloqué (fenêtre d'erreur invisible) : arrêt après 20 min avec un message, au lieu d'une attente
+  sans fin.
+- Préparation lancée en administrateur (clé neuve) : `winget` introuvable, car c'est un alias propre à
+  chaque utilisateur. Il est maintenant cherché dans le paquet App Installer.
+- Autorisation administrateur refusée : message explicite au lieu d'une simple ligne d'erreur dans le journal.
+- Téléchargements longs (ISO de plusieurs Go) abandonnés après 3 coupures réseau : une tentative qui a
+  progressé n'est plus comptée, l'ISO finit par reprise.
+- Proxy d'entreprise avec authentification Windows (erreur 407) : identifiants du poste transmis.
+- Clé en FAT32 : l'ISO de Windows (plus de 4 Go) échouait après un long téléchargement ; le kit le signale
+  avant de télécharger et explique comment réinstaller Ventoy en exFAT.
+
+### Ajouté
+
+- Une seule préparation à la fois sur un poste (assistant ouvert deux fois, assistant et ligne de commande) :
+  la seconde s'arrête avec un message au lieu d'écrire les mêmes fichiers de la clé en parallèle.
+- Windows : mise en veille suspendue pendant la préparation (l'écran peut s'éteindre).
+- Fin de préparation : cache d'écriture de la clé vidé avant d'annoncer « terminé ».
+
 ## [1.5.2] - 2026-10-12
 
 ### Corrigé
