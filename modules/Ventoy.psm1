@@ -39,7 +39,7 @@ function Get-KitUsbDisk {
         Disques USB/SD éligibles (jamais disque de démarrage ou système), avec leur état Ventoy.
     .OUTPUTS
         Objets : Id (numéro Windows ou /dev/sdX), Number, Name, Model, SizeGB, Size, Letters (lettres
-        ou points de montage), IsVentoy.
+        ou points de montage), IsVentoy, IsReadOnly, IsOffline.
     #>
     [CmdletBinding()]
     [OutputType([object[]])]
@@ -60,9 +60,11 @@ function Get-KitUsbDisk {
                 Size     = [double]$d.Size
                 Letters  = @($vols | Where-Object { $_.DriveLetter } | ForEach-Object { [string]$_.DriveLetter })
                 IsVentoy = [bool](@($vols | Where-Object { $_.FileSystemLabel -eq 'VTOYEFI' }).Count -gt 0)
+                IsReadOnly = [bool]$d.IsReadOnly
+                IsOffline  = [bool]$d.IsOffline
             }
         }
-        return , @($list)
+        return @($list | Where-Object { $null -ne $_ })
     }
     # Linux : lsblk ; on écarte tout disque portant / , /boot , /boot/efi , /home ou le swap
     $blocks = @(Get-KitLinuxBlock)
@@ -81,9 +83,11 @@ function Get-KitUsbDisk {
             Size     = [double]$d.size
             Letters  = @($children | Where-Object { $_.mountpoint } | ForEach-Object { [string]$_.mountpoint })
             IsVentoy = [bool](@($children | Where-Object { $_.label -eq 'VTOYEFI' }).Count -gt 0)
+            IsReadOnly = $false
+            IsOffline  = $false
         }
     }
-    return , @($list)
+    return @($list | Where-Object { $null -ne $_ })
 }
 
 function Assert-KitVentoyTarget {
@@ -164,7 +168,9 @@ function Invoke-KitVentoy2Disk {
         [switch] $Gpt,
         [switch] $NoSecureBoot,
         [ValidateSet('exFAT', 'NTFS', 'FAT32')] [string] $FileSystem = 'exFAT',
-        [string] $Label = 'Ventoy'
+        [string] $Label = 'Ventoy',
+        # Au-delà, Ventoy2Disk est considéré bloqué (fenêtre d'erreur invisible, disque verrouillé)
+        [int] $TimeoutMin = 20
     )
     $dir = Split-Path -Parent $Exe
     if (Test-KitWindows) {
@@ -179,7 +185,12 @@ function Invoke-KitVentoy2Disk {
         Write-KitLog -Level STEP -Message ("Ventoy2Disk {0}" -f ($argList -join ' '))
         $p = Start-Process -FilePath $Exe -ArgumentList $argList -WorkingDirectory $dir -PassThru
         $last = -1
+        $sw = [Diagnostics.Stopwatch]::StartNew()
         while (-not $p.HasExited) {
+            if ($sw.Elapsed.TotalMinutes -ge $TimeoutMin) {
+                try { $p.Kill() } catch { Write-Verbose 'Ventoy2Disk déjà terminé.' }
+                throw ("Ventoy2Disk ne répond plus après {0} min (disque verrouillé par un autre programme ?). Fermez les fenêtres ouvertes sur la clé, débranchez-la, rebranchez-la et relancez." -f $TimeoutMin)
+            }
             Start-Sleep -Seconds 2
             $pf = Join-Path $dir 'cli_percent.txt'
             if (Test-Path -LiteralPath $pf) {
@@ -223,6 +234,83 @@ function Invoke-KitVentoy2Disk {
     Write-KitLog -Level OK -Message ("Ventoy : {0} terminée ({1})." -f $(if ($Mode -eq 'Install') { 'installation' } else { 'mise à jour' }), $Disk)
 }
 
+function Initialize-KitUsbDisk {
+    <#
+    .SYNOPSIS
+        Windows : remet en ligne et en écriture un disque USB avant l'installation de Ventoy
+        (disques « hors ligne » ou « en lecture seule » après un usage sur un autre poste,
+        une stratégie SAN ou un outil de clonage). Droits administrateur requis.
+    #>
+    [CmdletBinding(SupportsShouldProcess)]
+    param([Parameter(Mandatory)] [int] $Number)
+    $d = Get-Disk -Number $Number -ErrorAction Stop
+    if ($d.IsOffline -and $PSCmdlet.ShouldProcess("Disque $Number", 'Mise en ligne')) {
+        Write-KitLog -Message "Disque $Number hors ligne : mise en ligne."
+        Set-Disk -Number $Number -IsOffline $false -ErrorAction Stop
+    }
+    if ($d.IsReadOnly -and $PSCmdlet.ShouldProcess("Disque $Number", 'Retrait de la lecture seule')) {
+        Write-KitLog -Message "Disque $Number en lecture seule : retrait de l'attribut."
+        try { Set-Disk -Number $Number -IsReadOnly $false -ErrorAction Stop }
+        catch { throw "Le disque $Number est protégé en écriture (petit interrupteur « Lock » sur la clé ou la carte SD ?) : $($_.Exception.Message)" }
+        if ((Get-Disk -Number $Number).IsReadOnly) { throw "Le disque $Number reste protégé en écriture : vérifiez l'interrupteur « Lock » de la clé ou de la carte SD." }
+    }
+}
+
+function Clear-KitUsbDisk {
+    <#
+    .SYNOPSIS
+        Windows : efface la table de partitions d'un disque USB (équivalent de « diskpart clean »).
+        Utilisé quand Ventoy2Disk refuse une ancienne clé (ISO écrite en mode DD, partitions
+        verrouillées, table de partitions abîmée). Droits administrateur requis.
+    #>
+    [CmdletBinding(SupportsShouldProcess, ConfirmImpact = 'High')]
+    param([Parameter(Mandatory)] [int] $Number)
+    if (-not $PSCmdlet.ShouldProcess("Disque $Number", 'Effacement de la table de partitions')) { return }
+    Write-KitLog -Level WARN -Message "Disque $Number : effacement de la table de partitions avant une nouvelle tentative."
+    # Volumes démontés d'abord : un Explorateur ouvert sur la clé ne bloque plus l'effacement
+    foreach ($v in @(Get-Partition -DiskNumber $Number -ErrorAction SilentlyContinue | Where-Object { $_.DriveLetter -and $_.DriveLetter -ne [char]0 })) {
+        try { $v | Remove-PartitionAccessPath -AccessPath ('{0}:\' -f $v.DriveLetter) -ErrorAction Stop } catch { Write-Verbose "Lettre $($v.DriveLetter) conservée." }
+    }
+    try { Clear-Disk -Number $Number -RemoveData -RemoveOEM -Confirm:$false -ErrorAction Stop }
+    catch {
+        # Disque « RAW » (jamais initialisé) : rien à effacer, Ventoy saura l'utiliser
+        if ((Get-Disk -Number $Number).PartitionStyle -ne 'RAW') { throw "Effacement du disque $Number impossible : $($_.Exception.Message)" }
+    }
+    try { Update-HostStorageCache -ErrorAction SilentlyContinue } catch { Write-Verbose 'Rafraîchissement du stockage indisponible.' }
+    Start-Sleep -Seconds 3
+}
+
+function Install-KitVentoy {
+    <#
+    .SYNOPSIS
+        Installe Ventoy sur un disque de façon fiable, y compris sur une ancienne clé :
+        disque remis en ligne / en écriture, puis en cas d'échec, effacement de la table de
+        partitions et seconde tentative (Windows). La confirmation d'effacement a déjà été exigée.
+    #>
+    [CmdletBinding(SupportsShouldProcess, ConfirmImpact = 'High')]
+    param(
+        [Parameter(Mandatory)] [string] $Exe,
+        [Parameter(Mandatory)] [string] $Disk,
+        [switch] $Gpt,
+        [switch] $NoSecureBoot,
+        [ValidateSet('exFAT', 'NTFS', 'FAT32')] [string] $FileSystem = 'exFAT',
+        [string] $Label = 'Ventoy'
+    )
+    if (-not $PSCmdlet.ShouldProcess("Disque $Disk", 'Installation de Ventoy (effacement)')) { return }
+    $common = @{ Exe = $Exe; Mode = 'Install'; Disk = $Disk; Gpt = $Gpt; NoSecureBoot = $NoSecureBoot; FileSystem = $FileSystem; Label = $Label; Confirm = $false }
+    if (-not (Test-KitWindows)) { Invoke-KitVentoy2Disk @common; return }
+    Initialize-KitUsbDisk -Number ([int]$Disk) -Confirm:$false
+    try { Invoke-KitVentoy2Disk @common }
+    catch {
+        Write-KitLog -Level WARN -Message ("Première tentative refusée ({0}). Ancienne clé : nettoyage puis nouvel essai." -f $_.Exception.Message)
+        # Le numéro désigne-t-il toujours une clé USB éligible ? (clé rebranchée et renumérotée entre-temps)
+        [void](Assert-KitVentoyTarget -Disk $Disk)
+        Clear-KitUsbDisk -Number ([int]$Disk) -Confirm:$false
+        Initialize-KitUsbDisk -Number ([int]$Disk) -Confirm:$false
+        Invoke-KitVentoy2Disk @common
+    }
+}
+
 function Wait-KitVentoyVolume {
     <#
     .SYNOPSIS
@@ -234,7 +322,7 @@ function Wait-KitVentoyVolume {
     param(
         [Parameter(Mandatory)] [string] $Disk,
         [string] $Label = 'Ventoy',
-        [int] $TimeoutSec = 90
+        [int] $TimeoutSec = 120
     )
     $sw = [Diagnostics.Stopwatch]::StartNew()
     while ($sw.Elapsed.TotalSeconds -lt $TimeoutSec) {
@@ -246,7 +334,10 @@ function Wait-KitVentoyVolume {
                     $part | Add-PartitionAccessPath -AssignDriveLetter -ErrorAction SilentlyContinue
                     $part = Get-Partition -DiskNumber ([int]$Disk) -PartitionNumber $part.PartitionNumber
                 }
-                if ($part.DriveLetter -and $part.DriveLetter -ne [char]0) { return ('{0}:\' -f $part.DriveLetter) }
+                if ($part.DriveLetter -and $part.DriveLetter -ne [char]0) {
+                    $root = ('{0}:\' -f $part.DriveLetter)
+                    if ((New-Object System.IO.DriveInfo($root)).IsReady) { return $root }
+                }
             }
         }
         else {
@@ -269,4 +360,5 @@ function Wait-KitVentoyVolume {
     throw "La partition « $Label » du disque $Disk n'est pas apparue (débranchez/rebranchez la clé puis relancez sans -InstallerVentoy)."
 }
 
-Export-ModuleMember -Function Test-KitAdmin, Get-KitUsbDisk, Assert-KitVentoyTarget, Save-KitVentoy, Invoke-KitVentoy2Disk, Wait-KitVentoyVolume
+Export-ModuleMember -Function Test-KitAdmin, Get-KitUsbDisk, Assert-KitVentoyTarget, Save-KitVentoy, Invoke-KitVentoy2Disk,
+    Initialize-KitUsbDisk, Clear-KitUsbDisk, Install-KitVentoy, Wait-KitVentoyVolume

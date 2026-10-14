@@ -40,7 +40,7 @@ function Get-KitLinuxBlock {
     [OutputType([object[]])]
     param()
     $json = & lsblk -J -b -o NAME,PATH,TYPE,SIZE,LABEL,FSTYPE,MOUNTPOINT,TRAN,MODEL,RM 2>$null | Out-String
-    if (-not $json.Trim()) { return , @() }
+    if (-not $json.Trim()) { return }
     $flat = New-Object System.Collections.Generic.List[object]
     $stack = New-Object System.Collections.Stack
     foreach ($n in @(($json | ConvertFrom-Json).blockdevices)) { $stack.Push(@($n, $null)) }
@@ -52,7 +52,9 @@ function Get-KitLinuxBlock {
         if ($n.type -eq 'disk') { $next = $n }
         if ($n.PSObject.Properties['children'] -and $n.children) { foreach ($c in @($n.children)) { $stack.Push(@($c, $next)) } }
     }
-    return , $flat.ToArray()
+    # Éléments émis un par un : l'appelant écrit @(Get-KitLinuxBlock). Avec « return , $tableau »,
+    # @() obtenait UN élément contenant toute la liste (détection faussée, plantage sans clé).
+    return $flat.ToArray()
 }
 
 function Get-KitFreeSpace {
@@ -71,40 +73,89 @@ function Get-KitFreeSpace {
     return [double]$info.AvailableFreeSpace
 }
 
+function Get-KitVentoyDiskNumber {
+    <#
+    .SYNOPSIS
+        Numéros des disques portant une partition VTOYEFI (Windows) : ce sont des clés Ventoy,
+        quel que soit le libellé de leur partition de données.
+    #>
+    [CmdletBinding()]
+    [OutputType([int[]])]
+    param()
+    try { return @(Get-Volume -FileSystemLabel 'VTOYEFI' -ErrorAction Stop | Get-Partition -ErrorAction Stop | ForEach-Object { [int]$_.DiskNumber } | Select-Object -Unique) }
+    catch { Write-Verbose 'Aucune partition VTOYEFI visible.'; return }
+}
+
+function Test-KitLinuxVentoyPart {
+    <#
+    .SYNOPSIS
+        Vrai si la partition Linux est la partition de données d'un disque Ventoy (première
+        partition d'un disque qui porte aussi une partition VTOYEFI).
+    #>
+    [CmdletBinding()]
+    [OutputType([bool])]
+    param([Parameter(Mandatory)] $Part, [Parameter(Mandatory)] [AllowEmptyCollection()] [object[]] $Blocks)
+    if (-not $Part.ParentDisk -or $Part.label -eq 'VTOYEFI') { return $false }
+    $siblings = @($Blocks | Where-Object { $_.type -eq 'part' -and $_.ParentDisk -and $_.ParentDisk.name -eq $Part.ParentDisk.name } | Sort-Object { [string]$_.name })
+    if (@($siblings | Where-Object { $_.label -eq 'VTOYEFI' }).Count -eq 0) { return $false }
+    return ($siblings.Count -gt 0 -and $siblings[0].name -eq $Part.name)
+}
+
 function Find-KitVentoyDrive {
     <#
     .SYNOPSIS
-        Liste les volumes montés dont le libellé est celui d'une clé Ventoy (détection automatique).
+        Liste les volumes montés qui sont des clés Ventoy (détection automatique).
+    .DESCRIPTION
+        Une clé est retenue si sa partition porte le libellé attendu (« Ventoy »), ou si elle est la
+        partition de données d'un disque qui porte une partition VTOYEFI (clé déjà utilisée dont le
+        libellé a été changé, ou affiché en majuscules en FAT32).
+        Sous Windows, les lecteurs réseau, CD et lecteurs de cartes sans carte sont ignorés : leur
+        interrogation peut bloquer la fenêtre plusieurs dizaines de secondes.
     #>
     [CmdletBinding()]
     [OutputType([object[]])]
     param([string] $ExpectedLabel = 'Ventoy')
     if (Test-KitWindows) {
+        $ventoyDisks = @(Get-KitVentoyDiskNumber)
         $found = foreach ($d in [IO.DriveInfo]::GetDrives()) {
+            if ($d.DriveType -ne [IO.DriveType]::Removable -and $d.DriveType -ne [IO.DriveType]::Fixed) { continue }
             try {
-                if ($d.IsReady -and $d.VolumeLabel -ceq $ExpectedLabel) {
-                    [pscustomobject]@{
-                        Letter = $d.Name.Substring(0, 1); Root = $d.Name; Label = $d.VolumeLabel
-                        TotalGB = [math]::Round($d.TotalSize / 1GB, 1); FreeGB = [math]::Round($d.AvailableFreeSpace / 1GB, 1)
-                        Removable = ($d.DriveType -eq [IO.DriveType]::Removable); Device = ''
-                    }
+                if (-not $d.IsReady) { continue }
+                $byPartition = $false
+                if ($d.VolumeLabel -cne $ExpectedLabel) {
+                    if ($ventoyDisks.Count -eq 0 -or $d.VolumeLabel -eq 'VTOYEFI') { continue }
+                    $p = Get-Partition -DriveLetter $d.Name.Substring(0, 1) -ErrorAction SilentlyContinue
+                    if (-not ($p -and [int]$p.DiskNumber -in $ventoyDisks -and $p.PartitionNumber -eq 1)) { continue }
+                    $byPartition = $true
+                }
+                [pscustomobject]@{
+                    Letter = $d.Name.Substring(0, 1); Root = $d.Name; Label = $d.VolumeLabel
+                    TotalGB = [math]::Round($d.TotalSize / 1GB, 1); FreeGB = [math]::Round($d.AvailableFreeSpace / 1GB, 1)
+                    Removable = ($d.DriveType -eq [IO.DriveType]::Removable); Device = ''; FileSystem = $d.DriveFormat
+                    ByPartition = $byPartition
                 }
             }
             catch { Write-Verbose "Lecteur $($d.Name) illisible : $($_.Exception.Message)" }
         }
-        return , @($found)
+        return @($found | Where-Object { $null -ne $_ })
     }
-    $found = foreach ($b in @(Get-KitLinuxBlock)) {
-        if ($b.type -eq 'part' -and $b.label -ceq $ExpectedLabel -and $b.mountpoint) {
-            $info = New-Object System.IO.DriveInfo($b.mountpoint)
-            [pscustomobject]@{
-                Letter = $null; Root = ($b.mountpoint.TrimEnd('/') + '/'); Label = $b.label
-                TotalGB = [math]::Round([double]$b.size / 1GB, 1); FreeGB = [math]::Round($info.AvailableFreeSpace / 1GB, 1)
-                Removable = $true; Device = $b.path
-            }
+    $blocks = @(Get-KitLinuxBlock)
+    $found = foreach ($b in $blocks) {
+        if ($b.type -ne 'part' -or -not $b.mountpoint) { continue }
+        $byPartition = $false
+        if ($b.label -cne $ExpectedLabel) {
+            if (-not (Test-KitLinuxVentoyPart -Part $b -Blocks $blocks)) { continue }
+            $byPartition = $true
+        }
+        $info = New-Object System.IO.DriveInfo($b.mountpoint)
+        [pscustomobject]@{
+            Letter = $null; Root = ($b.mountpoint.TrimEnd('/') + '/'); Label = [string]$b.label
+            TotalGB = [math]::Round([double]$b.size / 1GB, 1); FreeGB = [math]::Round($info.AvailableFreeSpace / 1GB, 1)
+            Removable = $true; Device = $b.path; FileSystem = [string]$b.fstype
+            ByPartition = $byPartition
         }
     }
-    return , @($found)
+    return @($found | Where-Object { $null -ne $_ })
 }
 
 function Test-KitDrive {
@@ -112,31 +163,47 @@ function Test-KitDrive {
     .SYNOPSIS
         Vérifie que la clé est bien la clé Ventoy attendue (lettre sous Windows, chemin sous Linux).
     .DESCRIPTION
-        Contrôles bloquants : le volume existe, est prêt, porte exactement le libellé attendu
-        (« Ventoy ») et dispose d'au moins MinFreeBytes. Lève une exception claire sinon.
+        Contrôles bloquants : le volume existe, est prêt (attente jusqu'à WaitSec secondes : une
+        clé tout juste branchée ou formatée par Ventoy n'est pas lisible immédiatement), est une clé
+        Ventoy — libellé attendu (« Ventoy ») ou partition VTOYEFI sur le même disque — et dispose
+        d'au moins MinFreeBytes. Lève une exception claire sinon.
     #>
     [CmdletBinding()]
     param(
         [char] $DriveLetter,
         [string] $Root,
         [string] $ExpectedLabel = 'Ventoy',
-        [double] $MinFreeBytes = 0
+        [double] $MinFreeBytes = 0,
+        [int] $WaitSec = 30
     )
     if (-not $Root) { $Root = Get-KitDriveRoot -DriveLetter $DriveLetter }
-    if (-not (Test-Path -LiteralPath $Root)) {
+    $info = $null
+    $sw = [Diagnostics.Stopwatch]::StartNew()
+    while ($true) {
+        if (Test-Path -LiteralPath $Root) {
+            $info = New-Object System.IO.DriveInfo($Root)
+            if ($info.IsReady) { break }
+        }
+        if ($sw.Elapsed.TotalSeconds -ge $WaitSec) { break }
+        Start-Sleep -Seconds 2
+    }
+    if (-not $info) {
         throw "La clé $Root est introuvable. Branchez la clé Ventoy ou indiquez-la avec -DriveLetter (Windows) / -KeyPath (Linux)."
     }
-    $info = New-Object System.IO.DriveInfo($Root)
-    if (-not $info.IsReady) { throw "Le volume $Root n'est pas prêt (clé débranchée ou illisible)." }
+    if (-not $info.IsReady) { throw "Le volume $Root n'est pas prêt (clé débranchée ou illisible). Débranchez et rebranchez la clé, puis relancez." }
 
     $label = ''
     $fs = $info.DriveFormat
+    $vtoyConfirmed = $false
     if (Test-KitWindows) {
         $label = $info.VolumeLabel
         try {
             $part = Get-Partition -DriveLetter $Root.Substring(0, 1) -ErrorAction Stop
             $vtoy = @(Get-Partition -DiskNumber $part.DiskNumber -ErrorAction Stop | Get-Volume -ErrorAction SilentlyContinue | Where-Object { $_.FileSystemLabel -eq 'VTOYEFI' })
-            if ($vtoy.Count -gt 0) { Write-KitLog -Message 'Partition VTOYEFI détectée : clé Ventoy confirmée.' }
+            if ($vtoy.Count -gt 0) {
+                Write-KitLog -Message 'Partition VTOYEFI détectée : clé Ventoy confirmée.'
+                $vtoyConfirmed = ($part.PartitionNumber -eq 1)
+            }
             else { Write-KitLog -Level WARN -Message 'Partition VTOYEFI non visible (normal sur certains systèmes). Le libellé « Ventoy » suffit.' }
         }
         catch { Write-KitLog -Level WARN -Message ("Lecture des partitions impossible ({0}). Contrôle VTOYEFI ignoré." -f $_.Exception.Message) }
@@ -147,14 +214,17 @@ function Test-KitDrive {
         $part = @($blocks | Where-Object { $_.mountpoint -eq $mount }) | Select-Object -First 1
         if ($part) {
             $label = [string]$part.label; $fs = [string]$part.fstype
-            $disk = $part.ParentDisk
-            if ($disk -and @($blocks | Where-Object { $_.ParentDisk -and $_.ParentDisk.name -eq $disk.name -and $_.label -eq 'VTOYEFI' }).Count -gt 0) {
+            if (Test-KitLinuxVentoyPart -Part $part -Blocks $blocks) {
                 Write-KitLog -Message 'Partition VTOYEFI détectée : clé Ventoy confirmée.'
+                $vtoyConfirmed = $true
             }
         }
     }
     if ($label -cne $ExpectedLabel) {
-        throw ("Le volume {0} a pour libellé « {1} » au lieu de « {2} ». Ce n'est pas la clé Ventoy attendue : arrêt par sécurité." -f $Root, $label, $ExpectedLabel)
+        if (-not $vtoyConfirmed) {
+            throw ("Le volume {0} a pour libellé « {1} » au lieu de « {2} » et ne porte pas de partition VTOYEFI. Ce n'est pas une clé Ventoy : arrêt par sécurité. Pour une clé neuve ou d'un autre usage, cochez « Clé neuve : installer Ventoy »." -f $Root, $label, $ExpectedLabel)
+        }
+        Write-KitLog -Level WARN -Message ("Libellé « {0} » au lieu de « {1} », mais la partition VTOYEFI du même disque confirme une clé Ventoy." -f $label, $ExpectedLabel)
     }
     $free = [double]$info.AvailableFreeSpace
     Write-KitLog -Message ("Clé {0} : libellé « {1} », {2}, taille {3}, libre {4}" -f $Root, $label, $fs, (Format-KitSize $info.TotalSize), (Format-KitSize $free))
@@ -164,4 +234,23 @@ function Test-KitDrive {
     return [pscustomobject]@{ Root = $Root; Label = $label; FileSystem = $fs; TotalBytes = [double]$info.TotalSize; FreeBytes = $free }
 }
 
-Export-ModuleMember -Function Test-KitWindows, Get-KitDriveRoot, Get-KitLinuxBlock, Get-KitFreeSpace, Find-KitVentoyDrive, Test-KitDrive
+function Sync-KitVolume {
+    <#
+    .SYNOPSIS
+        Vide le cache d'écriture du volume de la clé : les fichiers sont réellement sur la clé
+        quand le kit annonce « terminé » (sinon un retrait immédiat peut corrompre l'ISO).
+    #>
+    [CmdletBinding()]
+    param([Parameter(Mandatory)] [string] $Root)
+    try {
+        if (Test-KitWindows) { Write-VolumeCache -DriveLetter $Root.Substring(0, 1) -ErrorAction Stop }
+        else { & sync }
+        Write-KitLog -Message 'Écritures en attente vidées sur la clé.'
+    }
+    # Sans droits administrateur, Windows refuse le vidage explicite (les clés USB sont par défaut en
+    # « suppression rapide », sans cache d'écriture) : simple rappel, pas un avertissement
+    catch { Write-KitLog -Message ("Vidage du cache d'écriture non disponible ({0}) : utilisez « Retirer le périphérique en toute sécurité » avant de débrancher la clé." -f $_.Exception.Message) }
+}
+
+Export-ModuleMember -Function Test-KitWindows, Get-KitDriveRoot, Get-KitLinuxBlock, Get-KitFreeSpace, Get-KitVentoyDiskNumber,
+    Test-KitLinuxVentoyPart, Find-KitVentoyDrive, Test-KitDrive, Sync-KitVolume

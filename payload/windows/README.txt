@@ -5,7 +5,11 @@
 
 KEY CONTENTS
   ISO\{{ISO_NAME}}            Official Windows 11 (64-bit)
+  ISO\Windows10_*.iso         Official Windows 10 22H2 (if added)
   ISO\Linux\...               Linux systems (if added when building the key)
+  ISO\Personnel\              Your own images (Windows 7, 8.1…), if added
+  Windows7\                   Windows 7 compatibility pack (if added):
+                              see postinstall\Windows7.txt (French)
   Bureautique\                Microsoft 365 Apps and/or LibreOffice / ONLYOFFICE
   Logiciels\                  Browsers, PDF, media, utilities, tools
   postinstall\Lancer.bat      Installs software after Windows (window)
@@ -15,8 +19,9 @@ KEY CONTENTS
 STEP 1 — INSTALL WINDOWS 11 (or another system)
   1. Plug in the key, power on, open the boot menu (F12, F11, F9, F8 or Esc).
   2. Choose the USB key: the Ventoy menu lists every system.
-  3. Choose the Windows 11 ISO, then the "Windows11_HorsLigne.xml" template
-     (recommended: LOCAL account without Internet).
+  3. Choose the Windows 11 (or Windows 10) ISO, then the
+     "Windows11_HorsLigne.xml" template (recommended: LOCAL account without
+     Internet). Windows 7: see postinstall\Windows7.txt (Legacy/CSM boot).
   4. Product key: type it, or "I don't have a product key" (licensed PCs
      activate later automatically). PRO edition recommended.
   5. "Custom" install: CHOOSE THE RIGHT DISK. Deleting a partition erases it.

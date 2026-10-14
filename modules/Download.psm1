@@ -252,6 +252,71 @@ function Initialize-KitNetwork {
     $proto = [Net.SecurityProtocolType]::Tls12
     try { $proto = $proto -bor [Net.SecurityProtocolType]::Tls13 } catch { Write-Verbose 'TLS 1.3 indisponible sur ce système.' }
     [Net.ServicePointManager]::SecurityProtocol = $proto
+    # Proxy d'entreprise avec authentification Windows : sans ces identifiants, chaque requête
+    # échoue en « 407 Proxy Authentication Required »
+    try {
+        $proxy = [Net.WebRequest]::DefaultWebProxy
+        if ($proxy) { $proxy.Credentials = [Net.CredentialCache]::DefaultNetworkCredentials }
+    }
+    catch { Write-Verbose 'Proxy système non configurable.' }
+}
+
+function Initialize-KitWinget {
+    <#
+    .SYNOPSIS
+        Rend winget utilisable dans le processus courant et retourne son chemin (vide si absent).
+    .DESCRIPTION
+        winget est un « alias d'exécution » propre à chaque utilisateur. Dans une session élevée
+        (clé neuve : autorisation administrateur, parfois avec un AUTRE compte), il est souvent
+        introuvable. On le cherche alors dans le dossier de l'utilisateur et dans le paquet
+        App Installer, et on ajoute son dossier au PATH du processus.
+    #>
+    [CmdletBinding()]
+    [OutputType([string])]
+    param()
+    $cmd = Get-Command winget -ErrorAction SilentlyContinue
+    if ($cmd) { return [string]$cmd.Source }
+    if (-not (Test-KitWindows)) { return '' }
+    $candidates = @()
+    if ($env:LOCALAPPDATA) { $candidates += Join-Path $env:LOCALAPPDATA 'Microsoft\WindowsApps\winget.exe' }
+    $apps = Join-Path $env:ProgramFiles 'WindowsApps'
+    try {
+        $candidates += @(Get-ChildItem -LiteralPath $apps -Directory -Filter 'Microsoft.DesktopAppInstaller_*_8wekyb3d8bbwe' -ErrorAction Stop |
+                Sort-Object { try { [version](($_.Name -split '_')[1]) } catch { [version]'0.0' } } -Descending |
+                ForEach-Object { Join-Path $_.FullName 'winget.exe' })
+    }
+    catch { Write-Verbose "Dossier $apps illisible." }
+    foreach ($c in $candidates) {
+        if (Test-Path -LiteralPath $c) {
+            $env:PATH = (Split-Path -Parent $c) + [IO.Path]::PathSeparator + $env:PATH
+            Write-KitLog -Message ("winget trouvé hors du PATH : {0}" -f $c)
+            return $c
+        }
+    }
+    return ''
+}
+
+function Set-KitKeepAwake {
+    <#
+    .SYNOPSIS
+        Windows : empêche la mise en veille pendant la préparation (plusieurs Go à télécharger),
+        puis rétablit le comportement normal. L'écran peut s'éteindre, l'ordinateur reste actif.
+    #>
+    [CmdletBinding(SupportsShouldProcess)]
+    param([Parameter(Mandatory)] [bool] $Enabled)
+    if (-not (Test-KitWindows)) { return }
+    if (-not $PSCmdlet.ShouldProcess('Mise en veille', $(if ($Enabled) { 'Suspendre' } else { 'Rétablir' }))) { return }
+    try {
+        if (-not ('Alchemist.Power' -as [type])) {
+            Add-Type -Namespace Alchemist -Name Power -MemberDefinition '[DllImport("kernel32.dll")] public static extern uint SetThreadExecutionState(uint esFlags);'
+        }
+        # ES_CONTINUOUS (0x80000000) | ES_SYSTEM_REQUIRED (0x1)
+        $flags = [uint32]2147483648
+        if ($Enabled) { $flags = $flags -bor [uint32]1 }
+        [void][Alchemist.Power]::SetThreadExecutionState($flags)
+        if ($Enabled) { Write-KitLog -Message 'Mise en veille suspendue pendant la préparation.' }
+    }
+    catch { Write-Verbose ('Mise en veille non contrôlable : {0}' -f $_.Exception.Message) }
 }
 
 function Get-KitValue {
@@ -375,8 +440,14 @@ function Invoke-KitHttpDownload {
         Remove-Item -LiteralPath $part, $tagFile -Force -ErrorAction SilentlyContinue
     }
 
-    for ($attempt = 1; $attempt -le $script:MaxAttempts; $attempt++) {
+    # Les tentatives ne sont comptées que lorsqu'elles n'apportent rien : une connexion instable
+    # qui coupe régulièrement finit l'ISO (reprise) au lieu d'abandonner après 3 coupures.
+    $attempt = 0; $loops = 0
+    while ($true) {
+        $attempt++; $loops++
         $resp = $null; $stream = $null; $fs = $null
+        $sizeBefore = 0.0
+        if (Test-Path -LiteralPath $part) { $sizeBefore = [double](Get-Item -LiteralPath $part).Length }
         try {
             $have = 0.0
             if (Test-Path -LiteralPath $part) { $have = [double](Get-Item -LiteralPath $part).Length }
@@ -454,7 +525,16 @@ function Invoke-KitHttpDownload {
                 Remove-Item -LiteralPath $part -Force -ErrorAction SilentlyContinue
             }
             Write-KitLog -Level WARN -Message ("{0} : tentative {1}/{2} échouée : {3}" -f $label, $attempt, $script:MaxAttempts, $msg)
-            if ($attempt -lt $script:MaxAttempts) { Start-Sleep -Seconds (5 * $attempt) }
+            # Fichier fermé avant de le mesurer : le dernier bloc en mémoire tampon compte
+            if ($fs) { $fs.Dispose(); $fs = $null }
+            $sizeAfter = 0.0
+            if (Test-Path -LiteralPath $part) { $sizeAfter = [double](Get-Item -LiteralPath $part).Length }
+            if ($sizeAfter -gt $sizeBefore + 1MB -and $loops -lt 40) {
+                Write-KitLog -Message ("{0} : {1} reçus avant la coupure, reprise." -f $label, (Format-KitSize ($sizeAfter - $sizeBefore)))
+                $attempt = 0
+            }
+            if ($attempt -ge $script:MaxAttempts -or $loops -ge 40) { break }
+            Start-Sleep -Seconds (5 * [math]::Max(1, $attempt))
         }
         finally {
             if ($fs) { $fs.Dispose() }
@@ -462,7 +542,7 @@ function Invoke-KitHttpDownload {
             if ($resp) { $resp.Close() }
         }
     }
-    throw ("Échec du téléchargement après {0} tentatives : {1}" -f $script:MaxAttempts, $Url)
+    throw ("Échec du téléchargement après {0} tentatives : {1}" -f $loops, $Url)
 }
 
 function Test-KitSignature {
@@ -737,7 +817,7 @@ function Get-KitWindowsIsoUrl {
         $last = ($out | Select-Object -Last 3) -join ' | '
         if ($attempt -lt $script:MaxAttempts) { Start-Sleep -Seconds (10 * $attempt) }
     }
-    throw ("Fido n'a pas pu obtenir le lien officiel de l'ISO ({0}). Microsoft bloque parfois les requêtes automatisées (erreur 715-123130) : téléchargez l'ISO à la main depuis https://www.microsoft.com/fr-fr/software-download/windows11 , placez-la dans cache\Windows11\Windows11_FR_x64.iso puis relancez avec -SkipDownload." -f $last)
+    throw ("Fido n'a pas pu obtenir le lien officiel de l'ISO ({0}). Microsoft bloque parfois les requêtes automatisées (erreur 715-123130) : téléchargez l'ISO à la main depuis https://www.microsoft.com/fr-fr/software-download/windows{1} et collez le lien dans l'assistant (« Lien de l'ISO »), ou placez-la dans le cache sous le nom {2} puis relancez avec -SkipDownload." -f $last, $(if ([string]$Item.FidoWin -eq '10') { '10ISO' } else { '11' }), $Item.FileName)
 }
 
 function Get-KitOfficeVersion {
@@ -839,7 +919,7 @@ function Resolve-KitPlan {
             foreach ($f in @($item.Files)) {
                 $ri = Get-KitRemoteInfo -Url $f.Url
                 $name = Get-KitValue $f 'FileName' $ri.FileName
-                $files += [pscustomobject]@{ Url = $f.Url; FinalUrl = $ri.FinalUrl; Length = $ri.Length; LastModified = $ri.LastModified; FileName = $name }
+                $files += [pscustomobject]@{ Url = $f.Url; FinalUrl = $ri.FinalUrl; Length = $ri.Length; LastModified = $ri.LastModified; FileName = $name; Sha256 = [string](Get-KitValue $f 'Sha256' '') }
             }
             $Plan.Source = $files
             $total = 0.0; $known = $true
@@ -882,7 +962,12 @@ function Resolve-KitPlan {
             }
         }
         'WindowsIso' {
-            if ($WindowsIsoUrl) {
+            # Le lien manuel ne vaut que pour SA version de Windows : les noms Microsoft commencent par
+            # « Win10_ » / « Win11_ » ; un nom illisible est attribué à l'ISO principale (Windows 11)
+            $manualFor = ''
+            if ($WindowsIsoUrl -and (([uri]$WindowsIsoUrl).AbsolutePath -match '/Win(\d+)_')) { $manualFor = $Matches[1] }
+            $useManual = [bool]$WindowsIsoUrl -and (($manualFor -and $manualFor -eq [string]$item.FidoWin) -or (-not $manualFor -and [int](Get-KitValue $item 'Priority' 9) -le 1))
+            if ($useManual) {
                 # Lien officiel fourni par l'opérateur (Fido bloqué) : domaine Microsoft obligatoire
                 $hostName = ([uri]$WindowsIsoUrl).Host
                 if ($hostName -notmatch '(^|\.)microsoft\.com$') { throw "-WindowsIsoUrl doit pointer vers un domaine microsoft.com (reçu : $hostName)." }
@@ -1124,7 +1209,12 @@ function Save-KitUrlItem {
     foreach ($f in $Plan.Source) {
         $dest = Join-Path $StageDir $f.FileName
         Invoke-KitHttpDownload -Url $f.Url -Destination $dest -ExpectedLength $f.Length -SourceTag ("{0}|{1}|{2}" -f $f.FinalUrl, $f.Length, $f.LastModified)
-        $sigs += ("{0} : {1}" -f $f.FileName, (Test-KitSignature -Path $dest -Signer (Get-KitValue $item 'Signer' '') -Required))
+        if ($f.Sha256) {
+            # Fichier officiel figé et non signé : l'empreinte fixée dans le profil fait foi
+            if ((Get-KitSha256 -Path $dest) -ne $f.Sha256.ToLowerInvariant()) { Remove-Item -LiteralPath $dest -Force; throw "$($f.FileName) : SHA256 différent de l'empreinte attendue. Fichier refusé." }
+            $sigs += ("{0} : SHA256 conforme à l'empreinte fixée" -f $f.FileName)
+        }
+        else { $sigs += ("{0} : {1}" -f $f.FileName, (Test-KitSignature -Path $dest -Signer (Get-KitValue $item 'Signer' '') -Required)) }
         $files += @{ Name = $f.FileName; Sha256 = (Get-KitSha256 -Path $dest); Length = (Get-Item -LiteralPath $dest).Length; Url = $f.Url; FinalUrl = $f.FinalUrl; LastModified = $f.LastModified }
     }
     $installer = Get-KitValue $item 'Installer' $files[0].Name
@@ -1272,7 +1362,7 @@ function Save-KitPlan {
     return $stage
 }
 
-Export-ModuleMember -Function Initialize-KitNetwork, Get-KitValue, Get-KitSha256, Get-KitRemoteInfo,
+Export-ModuleMember -Function Initialize-KitNetwork, Initialize-KitWinget, Set-KitKeepAwake, Get-KitValue, Get-KitSha256, Get-KitRemoteInfo,
     Invoke-KitHttpDownload, Test-KitSignature, Test-KitIsoFile, Get-KitKeySource, Get-KitStageDir,
     Test-KitStageComplete, Get-KitWingetInfo, Get-KitWindowsIsoUrl, Get-KitOfficeVersion,
     Resolve-KitPlan, Save-KitPlan, Set-KitSignaturePolicy, Get-KitGitHubRelease, Expand-KitPortable,

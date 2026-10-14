@@ -7,6 +7,57 @@ la [gestion sémantique de version](https://semver.org/lang/fr/) (`MAJEUR.MINEUR
 
 ## [Non publié]
 
+### Corrigé
+
+- Windows : l'assistant ne se lançait pas, sans aucun message (PowerShell démarré sans fenêtre). Nouveau
+  lanceur `modules/Lanceur.ps1` : message clair et `logs\demarrage-*.log` si la fenêtre ne peut pas s'ouvrir
+  (archive ZIP non extraite, PowerShell en mode restreint AppLocker/WDAC), fichiers du kit débloqués
+  (marque « Internet »), un seul assistant ouvert à la fois. Dépannage : `Creer-Cle.bat -Console`.
+- Windows : fenêtre figée au démarrage et à « Actualiser » quand un lecteur réseau déconnecté, un lecteur de
+  CD ou un lecteur de cartes vide était présent : ces lecteurs ne sont plus interrogés.
+- Ancienne clé Ventoy non reconnue quand le libellé de sa partition n'était pas exactement « Ventoy »
+  (renommée, ou affichée « VENTOY » en FAT32) : la partition VTOYEFI du même disque suffit désormais.
+- Clé neuve : « Le volume n'est pas prêt » juste après l'installation de Ventoy ; le kit attend que Windows
+  ait monté la partition (jusqu'à 30 s) avant de la contrôler.
+- Clé neuve sur une ancienne clé (ISO écrite en mode DD, partitions verrouillées, table abîmée) : quand
+  Ventoy2Disk refuse le disque, la table de partitions est effacée puis l'installation est réessayée. Un
+  disque hors ligne ou en lecture seule est remis en état ; une clé verrouillée par son interrupteur est
+  signalée clairement.
+- Ventoy2Disk bloqué (fenêtre d'erreur invisible) : arrêt après 20 min avec un message, au lieu d'une attente
+  sans fin.
+- Préparation lancée en administrateur (clé neuve) : `winget` introuvable, car c'est un alias propre à
+  chaque utilisateur. Il est maintenant cherché dans le paquet App Installer.
+- Autorisation administrateur refusée : message explicite au lieu d'une simple ligne d'erreur dans le journal.
+- Téléchargements longs (ISO de plusieurs Go) abandonnés après 3 coupures réseau : une tentative qui a
+  progressé n'est plus comptée, l'ISO finit par reprise.
+- Proxy d'entreprise avec authentification Windows (erreur 407) : identifiants du poste transmis.
+- Clé en FAT32 : l'ISO de Windows (plus de 4 Go) échouait après un long téléchargement ; le kit le signale
+  avant de télécharger et explique comment réinstaller Ventoy en exFAT.
+
+### Ajouté
+
+- **Windows 10 22H2** (dernière version, ISO officielle Microsoft via Fido) proposé dans « Systèmes
+  supplémentaires », décoché par défaut, pour les PC incompatibles avec Windows 11. Tous les logiciels de la clé
+  et la post-installation fonctionnent aussi sous Windows 10 ; installation hors ligne Ventoy avec le même modèle.
+  Lien vers la page officielle Microsoft sur l'écran de préparation ; un lien `-WindowsIsoUrl` collé à la main
+  est attribué à la bonne version de Windows (`Win10_…` / `Win11_…`).
+- **Images personnelles** (bouton « ISO personnelle… », `-IsoPersonnelle`) : Windows 7, 8.1 sous licence ou tout
+  autre système copié dans `ISO/Personnel/`, avec vérification SHA256 de la copie ; jamais supprimé par le kit.
+  Microsoft ne distribue plus Windows 7 : le kit ne propose aucune source non officielle.
+- **Pack de compatibilité Windows 7** (dernières versions officielles encore compatibles) : .NET Framework 4.8,
+  WMF 5.1 / PowerShell 5.1 (empreinte SHA256 fixée), Firefox ESR 115. Coché automatiquement quand une ISO de
+  Windows 7 est ajoutée ; `Lancer.bat` détecte Windows 7/8.1 et ouvre ce pack avec son mode d'emploi
+  (`postinstall\Windows7.txt`) au lieu d'échouer.
+- Colonne « Windows » dans la liste : versions de Windows compatibles avec chaque logiciel ; conseil contextuel
+  quand Windows 10 ou le pack Windows 7 est coché.
+- Profils : champ `Compat` (versions de Windows prises en charge) et `Sha256` dans `Files` (fichier officiel figé
+  et non signé).
+- CI : l'assistant Windows est construit en FR et EN à chaque commit, captures publiées en artefact.
+- Une seule préparation à la fois sur un poste (assistant ouvert deux fois, assistant et ligne de commande) :
+  la seconde s'arrête avec un message au lieu d'écrire les mêmes fichiers de la clé en parallèle.
+- Windows : mise en veille suspendue pendant la préparation (l'écran peut s'éteindre).
+- Fin de préparation : cache d'écriture de la clé vidé avant d'annoncer « terminé ».
+
 ## [1.5.2] - 2026-10-12
 
 ### Corrigé

@@ -1,0 +1,25 @@
+﻿==========================================================================
+ POSTE SOUS WINDOWS 7 (ou 8.1) — Alchemist v{{KIT_VERSION}}
+==========================================================================
+
+Windows 7 n'est plus pris en charge par Microsoft depuis 2020 (2023 avec
+l'ESU) : plus aucune mise à jour de sécurité. À n'utiliser que hors ligne ou
+pour une machine qui ne peut pas faire autrement (logiciel métier, matériel
+ancien). Le PC démarre-t-il la clé ? Windows 7 exige le mode « Legacy / CSM »
+du BIOS sur la plupart des PC récents.
+
+La post-installation automatique (Lancer.bat) exige Windows 10 ou 11. Sous
+Windows 7, installez le pack de compatibilité DANS CET ORDRE, depuis le
+dossier Windows7 de la clé (préparé en cochant « Compatibilité Windows 7 ») :
+
+  1-DotNet48      .NET Framework 4.8 (double-cliquer, puis redémarrer)
+  2-WMF51         PowerShell 5.1 : décompresser le zip, puis lancer le
+                  fichier .msu (Windows 7 SP1 x64 requis), puis redémarrer
+  3-FirefoxESR    Firefox ESR 115, dernier navigateur maintenu pour Windows 7
+
+Logiciel de la clé qui fonctionne aussi sous Windows 7 : 7-Zip (dossier
+Logiciels). Les autres (Office, navigateurs récents…) exigent Windows 10 ou 11.
+
+Le kit ne fournit PAS d'ISO de Windows 7 (Microsoft ne la distribue plus) :
+ajoutez la vôtre, issue d'un support sous licence, avec le bouton
+« ISO personnelle… » de l'assistant. Elle est copiée dans ISO\Personnel.

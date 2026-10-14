@@ -22,7 +22,11 @@
 #   Scope           : (optionnel) portée winget à forcer (machine ou user).
 #   Repo            : (Type GitHub) « propriétaire/dépôt » ; dernière version STABLE uniquement.
 #   AssetPattern    : (Type GitHub) regex du fichier à prendre dans la release.
-#   Files           : (Type Url) liste de @{ Url = … ; FileName = … (optionnel) }.
+#   Files           : (Type Url) liste de @{ Url = … ; FileName = … (optionnel) ; Sha256 = … (optionnel) }.
+#                     Sha256 : empreinte fixée pour un fichier officiel figé et non signé (ex. zip
+#                     Microsoft) : elle remplace alors l'exigence de signature.
+#   Compat          : versions de Windows prises en charge (défaut : 11 et 10). Affiché dans
+#                     l'assistant ; « 7 » = pack de compatibilité Windows 7.
 #   FallbackUrl     : (optionnel) URL officielle de l'éditeur si winget échoue.
 #   Extract         : $true = archive zip décompressée dans <dossier>\app (outil portable).
 #   Launcher        : (outil portable) motif du programme à lancer dans <dossier>\app.
@@ -94,6 +98,26 @@
             FidoRel         = 'Latest'
             FidoEd          = 'Pro'          # ISO multi-éditions « Home/Pro/Edu »
             FidoLang        = '^French$'     # remplacé selon -Langue (regex : exclut « French Canadian »)
+            FidoArch        = 'x64'
+        }
+
+        # Windows 10 22H2 (dernière version, ISO officielle Microsoft via Fido) : pour les PC sans
+        # TPM 2.0 ni processeur compatible Windows 11. Support Microsoft terminé le 14/10/2025 (mises
+        # à jour seulement avec l'ESU) : à réserver aux cas où Windows 11 est impossible.
+        # Tous les logiciels de la clé et la post-installation fonctionnent aussi sous Windows 10.
+        @{
+            Name            = 'Windows10'
+            Category        = 'Systèmes supplémentaires'
+            Type            = 'WindowsIso'
+            Priority        = 6
+            Default         = $false
+            TargetDir       = 'ISO'
+            FileName        = 'Windows10_{LANG}_x64.iso'
+            EstimatedSizeMB = 5900
+            FidoWin         = '10'
+            FidoRel         = 'Latest'
+            FidoEd          = 'Pro'          # ISO « Windows 10 Home/Pro/Edu »
+            FidoLang        = '^French$'
             FidoArch        = 'x64'
         }
 
@@ -359,6 +383,35 @@
             Signer = ''
             SilentArgs = '/VERYSILENT /NORESTART /SUPPRESSMSGBOXES /SP-'; SuccessCodes = @(0)
             Detection = 'reg:^HWiNFO'; Order = 92
+        }
+
+        # ================================================================== Compatibilité Windows 7
+        # Microsoft ne distribue plus d'ISO de Windows 7 : ajoutez la VÔTRE dans l'assistant
+        # (« ISO personnelle… », support d'installation sous licence). Ce pack réunit les dernières
+        # versions officielles qui fonctionnent encore sous Windows 7 SP1 x64. Outils manuels :
+        # la post-installation automatique exige Windows 10/11 (voir postinstall\Windows7.txt).
+        @{
+            Name = 'Win7_DotNet48'; Category = 'Compatibilité Windows 7'; Type = 'Url'; Mode = 'Manuel'; Priority = 8; Default = $false
+            TargetDir = 'Windows7/1-DotNet48'; EstimatedSizeMB = 116; Compat = @('7')
+            # .NET Framework 4.8 hors ligne (dernière version pour Windows 7 ; requis par WMF 5.1)
+            Files = @( @{ Url = 'https://go.microsoft.com/fwlink/?linkid=2088631' } )
+            Signer = 'Microsoft Corporation'
+            SilentArgs = '/q /norestart'; SuccessCodes = @(0, 3010, 1641)
+        }
+        @{
+            Name = 'Win7_WMF51'; Category = 'Compatibilité Windows 7'; Type = 'Url'; Mode = 'Manuel'; Priority = 8; Default = $false
+            TargetDir = 'Windows7/2-WMF51'; EstimatedSizeMB = 65; Compat = @('7')
+            # Windows Management Framework 5.1 (PowerShell 5.1, KB3191566) : fichier figé depuis 2017
+            Files = @( @{ Url = 'https://download.microsoft.com/download/6/F/5/6F5FF66C-6775-42B0-86C4-47D41F2DA187/Win7AndW2K8R2-KB3191566-x64.zip'
+                    Sha256 = 'f383c34aa65332662a17d95409a2ddedadceda74427e35d05024cd0a6a2fa647' } )
+        }
+        @{
+            Name = 'Win7_FirefoxESR'; Category = 'Compatibilité Windows 7'; Type = 'Url'; Mode = 'Manuel'; Priority = 8; Default = $false
+            TargetDir = 'Windows7/3-FirefoxESR'; EstimatedSizeMB = 57; Compat = @('7')
+            # Firefox ESR 115 : dernière branche de Firefox pour Windows 7, toujours corrigée par Mozilla
+            Files = @( @{ Url = 'https://download.mozilla.org/?product=firefox-esr115-latest-ssl&os=win64&lang=fr' } )
+            Signer = 'Mozilla Corporation'
+            SilentArgs = '/S'; SuccessCodes = @(0)
         }
     )
 }

@@ -40,6 +40,7 @@
 | --- | --- |
 | 🧭 **Choix guidé** | Système (Windows / Linux) → usage (bureautique / développement) → versions → clé |
 | 🪟 **Windows 11** | ISO officielle (FR, EN, ES, DE, PT), Microsoft 365 hors ligne **ou** LibreOffice / ONLYOFFICE, logiciels, **installation 100 % hors ligne** |
+| 🕰️ **Windows 10 / 7** | Windows 10 22H2 officiel en option (PC sans TPM 2.0) ; Windows 7 / 8.1 avec **votre** ISO + pack de compatibilité (.NET 4.8, PowerShell 5.1, Firefox ESR) |
 | 🐧 **Linux** | Ubuntu LTS (recommandé), Linux Mint, Debian, Fedora — stack bureautique ou développeur via les dépôts officiels |
 | 👩‍💻 **Développeurs** | VS Code, Git + GitHub CLI, Docker Engine natif + Podman Desktop, Trivy (scan de sécurité), WSL 2, Python/uv, Node.js LTS, Java, .NET, Go, Rust, Bruno, DBeaver… |
 | 📄 **Microsoft 365 sous Linux** | **version de bureau intégrale** (vrai Word, Excel, PowerPoint, Outlook, OneNote) via LinOffice, + ONLYOFFICE |
@@ -72,6 +73,12 @@ git clone https://github.com/dreamdogbo/alchemist-usb.git
 
 ou téléchargez l'archive de la [dernière version](https://github.com/dreamdogbo/alchemist-usb/releases), puis
 **double-cliquez `Creer-Cle.bat`**. Cochez « Clé neuve : installer Ventoy » si la clé n'a pas encore Ventoy.
+
+**Si la fenêtre ne s'ouvre pas** : un message indique la cause (archive non extraite, PowerShell restreint par
+l'entreprise…) et le détail est dans `logs\demarrage-*.log`. Pour voir toutes les erreurs, lancez
+`Creer-Cle.bat -Console` depuis une invite de commandes. Une **ancienne clé** que Ventoy refuse (ISO écrite
+avec Rufus en mode DD, partitions verrouillées, disque en lecture seule) est remise à zéro puis réessayée
+automatiquement en mode « Clé neuve ».
 
 ## Démarrage rapide — Linux
 
@@ -163,7 +170,7 @@ Post-installation Windows : `Install-Poste.ps1 [-Logiciels a,b] [-AvecOutils] [-
 
 ```text
 alchemist-usb/
-├── Creer-Cle.bat / Assistant.ps1     assistant Windows (fenêtre)
+├── Creer-Cle.bat / Assistant.ps1     assistant Windows (fenêtre) ; modules/Lanceur.ps1 : contrôles de démarrage
 ├── creer-cle.sh                      assistant Linux (zenity)
 ├── Build-Kit.ps1                     moteur (Windows et Linux, PowerShell 7 / 5.1)
 ├── config/profils/*.psd1             profils Système × Usage (héritage)
@@ -202,6 +209,8 @@ Détails : [ROADMAP.md](ROADMAP.md).
 - **Post-installation Linux** : en ligne (dépôts officiels) ; l'installation hors ligne viendra plus tard.
 - **Compte local Windows hors ligne** : Microsoft durcit l'OOBE ; repli `Maj+F10` → `start ms-cxh:localonly`.
 - La suite **ArtCraft** est encore jeune (versions 0.x) : proposée en option.
+- **Clé en FAT32** : aucun fichier de 4 Go ou plus (ISO de Windows) ; le kit le signale avant de télécharger.
+  Réinstallez Ventoy en exFAT (case « Clé neuve »).
 
 ---
 
