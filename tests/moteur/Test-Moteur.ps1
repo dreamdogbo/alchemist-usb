@@ -187,16 +187,23 @@ Invoke-Essai 'Scripts Linux en LF, avec shebang bash' {
         Assert-Vrai ($t.StartsWith('#!/usr/bin/env bash')) "$($sh.Name) : shebang manquant"
     }
 }
+Invoke-Essai 'Lanceurs Windows (.bat) en CRLF : cmd.exe gère mal les étiquettes en LF' {
+    foreach ($b in @(Get-ChildItem -LiteralPath $kitRoot -Recurse -File | Where-Object { $_.Extension -eq '.bat' -and $_.FullName -notmatch '[\\/](cache|logs|\.git)[\\/]' })) {
+        $t = [IO.File]::ReadAllText($b.FullName)
+        Assert-Vrai ($t.Contains("`r`n") -and -not ($t -replace "`r`n", '').Contains("`n")) "$($b.Name) : fins de ligne LF"
+    }
+}
 Invoke-Essai 'Modèles : tous les jetons {{…}} sont connus du moteur' {
     $connus = @('{{ISO_NAME}}', '{{ISO_NAME_W10}}', '{{UI_LANG}}', '{{INPUT_LOCALE}}', '{{TIMEZONE}}', '{{KIT_VERSION}}')
-    foreach ($f in @(Get-ChildItem -LiteralPath (Join-Path $kitRoot 'payload') -Recurse -File -Include '*.xml', '*.json', '*.txt', '*.md')) {
+    foreach ($f in @(Get-ChildItem -LiteralPath (Join-Path $kitRoot 'payload') -Recurse -File | Where-Object { $_.Extension -in @('.xml', '.json', '.txt', '.md') })) {
         foreach ($m in [regex]::Matches([IO.File]::ReadAllText($f.FullName), '\{\{[A-Z0-9_]+\}\}')) {
             Assert-Vrai ($m.Value -in $connus) "$($f.Name) : jeton inconnu $($m.Value)"
         }
     }
 }
 Invoke-Essai 'Fichiers XML et JSON de la clé bien formés' {
-    foreach ($f in @(Get-ChildItem -LiteralPath (Join-Path $kitRoot 'payload'), (Join-Path $kitRoot 'config') -Recurse -File -Include '*.xml', '*.json')) {
+    # (filtre par extension : sous Windows PowerShell 5.1, -Include est ignoré avec -LiteralPath)
+    foreach ($f in @(Get-ChildItem -LiteralPath (Join-Path $kitRoot 'payload'), (Join-Path $kitRoot 'config') -Recurse -File | Where-Object { $_.Extension -in @('.xml', '.json') })) {
         $t = [IO.File]::ReadAllText($f.FullName)
         if ($f.Extension -eq '.xml') { [void]([xml]$t) } else { [void]($t | ConvertFrom-Json) }
     }

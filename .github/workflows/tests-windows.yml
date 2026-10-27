@@ -176,6 +176,8 @@ jobs:
               $cat = Get-Content V:\postinstall\catalogue.json -Raw -Encoding UTF8 | ConvertFrom-Json
               if ($cat.Settings.TimeZone -ne 'Greenwich Standard Time') { throw "fuseau Windows : $($cat.Settings.TimeZone)" }
               if (-not (Test-Path V:\Logiciels\Chocolatey\*.msi)) { throw 'Chocolatey non téléchargé' }
+              $bat = [IO.File]::ReadAllText('V:\postinstall\Lancer.bat')
+              if (($bat -replace "`r`n", '').Contains("`n")) { throw 'Lancer.bat converti en LF sur la clé (cmd.exe : étiquettes cassées)' }
             }
             'Linux' {
               .\Build-Kit.ps1 -Systeme Linux -Usage Developpement -SkipDownload -DriveLetter V

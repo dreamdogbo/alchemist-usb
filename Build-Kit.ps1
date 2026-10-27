@@ -563,7 +563,8 @@ try {
         }
         # Scripts Linux : fins de ligne LF, même si la copie du kit les a converties en CRLF
         # (Git pour Windows, archive décompressée par un outil Windows) ; bash échouerait sinon
-        foreach ($sh in @(Get-ChildItem -LiteralPath $gen -Recurse -File -Include '*.sh')) {
+        # (filtre par extension : sous Windows PowerShell 5.1, -Include est ignoré avec -LiteralPath)
+        foreach ($sh in @(Get-ChildItem -LiteralPath $gen -Recurse -File | Where-Object { $_.Extension -eq '.sh' })) {
             $texte = [IO.File]::ReadAllText($sh.FullName)
             if ($texte.Contains("`r")) { [IO.File]::WriteAllText($sh.FullName, $texte.Replace("`r`n", "`n"), (New-Object Text.UTF8Encoding($false))) }
         }
@@ -595,7 +596,7 @@ try {
             '{{TIMEZONE}}'     = $tzWindows
             '{{KIT_VERSION}}'  = $kitVersion
         }
-        foreach ($tf in @(Get-ChildItem -LiteralPath $gen -Recurse -File -Include '*.xml', '*.json', '*.txt', '*.md')) {
+        foreach ($tf in @(Get-ChildItem -LiteralPath $gen -Recurse -File | Where-Object { $_.Extension -in @('.xml', '.json', '.txt', '.md') })) {
             $content = [IO.File]::ReadAllText($tf.FullName)
             if ($content -notmatch '\{\{[A-Z0-9_]+\}\}') { continue }
             foreach ($k in $tokens.Keys) { $content = $content.Replace($k, $tokens[$k]) }
