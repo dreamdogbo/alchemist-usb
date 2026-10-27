@@ -65,7 +65,7 @@ jobs:
           $log = "$env:RUNNER_TEMP\relance.log"
           .\Build-Kit.ps1 -Profil windows11-developpement -Only Chocolatey,Win7_WMF51 -DriveLetter V -LogFile $log
           if ($LASTEXITCODE -ne 0) { throw "code $LASTEXITCODE" }
-          if (-not (Select-String -LiteralPath $log -Pattern 'déjà à jour' -Quiet)) { throw 'Éléments retéléchargés' }
+          if (-not (Select-String -LiteralPath $log -Pattern 'd\u00e9j\u00e0 \u00e0 jour' -Quiet)) { throw 'Éléments retéléchargés' }
 
       - name: Post-installation RÉELLE depuis la clé (Chocolatey, 7-Zip, VS Code)
         shell: powershell
@@ -106,7 +106,7 @@ jobs:
           $c = (Invoke-RestMethod http://127.0.0.1:18766/api/composants -Headers $h).composants
           $c | Format-Table id, categorie, etat -AutoSize
           $choco = @($c | Where-Object id -eq 'Chocolatey')[0]
-          if ($choco.etat -ne 'déjà installé') { throw "Chocolatey : état « $($choco.etat) »" }
+          if ($choco.etat -notmatch '^d\u00e9j\u00e0 install\u00e9$') { throw "Chocolatey : état « $($choco.etat) »" }
           $e = Invoke-RestMethod http://127.0.0.1:18766/api/etat -Headers $h
           if ($e.mode -ne 'poste' -or $e.hote -ne 'Windows' -or $e.usage -ne 'developpement') { throw "état inattendu : $($e | ConvertTo-Json -Compress)" }
           Stop-Process -Id $p.Id -Force
