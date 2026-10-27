@@ -528,7 +528,12 @@ try {
             }
         }
         catch {
-            Add-KitResult -Name $p.Name -Status 'ÉCHEC' -Detail $_.Exception.Message
+            # Source « manifeste winget » refusée par l'éditeur (téléchargement direct interdit, 403…) :
+            # le logiciel reste au catalogue et la post-installation l'installe en ligne (winget)
+            if ($p.Source -and $p.Source.PSObject.Properties['Manifest'] -and $_.Exception.Message -match '403|404|page web') {
+                Add-KitResult -Name $p.Name -Status 'IGNORÉ' -Detail ("téléchargement direct refusé par l'éditeur : installé en ligne sur le poste (winget) — {0}" -f $_.Exception.Message)
+            }
+            else { Add-KitResult -Name $p.Name -Status 'ÉCHEC' -Detail $_.Exception.Message }
         }
     }
 

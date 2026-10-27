@@ -442,7 +442,7 @@ function Invoke-KitHttpDownload {
 
     # Les tentatives ne sont comptées que lorsqu'elles n'apportent rien : une connexion instable
     # qui coupe régulièrement finit l'ISO (reprise) au lieu d'abandonner après 3 coupures.
-    $attempt = 0; $loops = 0
+    $attempt = 0; $loops = 0; $lastError = ''
     while ($true) {
         $attempt++; $loops++
         $resp = $null; $stream = $null; $fs = $null
@@ -520,6 +520,7 @@ function Invoke-KitHttpDownload {
         }
         catch {
             $msg = $_.Exception.Message
+            $lastError = $msg
             # 416 = plage demandée invalide : le .part est déjà complet ou corrompu
             if ($msg -match '416') {
                 Remove-Item -LiteralPath $part -Force -ErrorAction SilentlyContinue
@@ -542,7 +543,7 @@ function Invoke-KitHttpDownload {
             if ($resp) { $resp.Close() }
         }
     }
-    throw ("Échec du téléchargement après {0} tentatives : {1}" -f $loops, $Url)
+    throw ("Échec du téléchargement après {0} tentatives : {1} (dernière erreur : {2})" -f $loops, $Url, $lastError)
 }
 
 function Test-KitSignature {
@@ -1034,7 +1035,9 @@ function Resolve-KitPlan {
             $Plan.Version = $info.Version
             $Plan.Source = $info
             try {
-                $ri = Get-KitRemoteInfo -Url $info.Url
+                # Manifeste : agent honnête (SourceForge sert alors le fichier, et non une page d'attente)
+                $agent = $(if ($info.PSObject.Properties['Manifest']) { $script:PlainAgent } else { '' })
+                $ri = Get-KitRemoteInfo -Url $info.Url -Agent $agent
                 if ($ri.Length -gt 0) { $Plan.NewBytes = $ri.Length; $Plan.SizeSource = 'winget+HEAD' }
             }
             catch { Write-KitLog -Level WARN -Message ("{0} : taille non lue ({1}), valeur de repli utilisée." -f $item.Name, $_.Exception.Message) }
@@ -1269,7 +1272,7 @@ function Save-KitWingetManifestItem {
     $dest = Join-Path $StageDir $info.FileName
     $len = -1.0
     if ($Plan.SizeSource -ne 'repli') { $len = [double]$Plan.NewBytes }
-    Invoke-KitHttpDownload -Url $info.Url -Destination $dest -ExpectedLength $len -SourceTag ("{0}|{1}" -f $info.Url, $info.Sha256)
+    Invoke-KitHttpDownload -Url $info.Url -Destination $dest -ExpectedLength $len -SourceTag ("{0}|{1}" -f $info.Url, $info.Sha256) -Agent $script:PlainAgent
     $sha = Get-KitSha256 -Path $dest
     if ($sha -ne $info.Sha256) { Remove-Item -LiteralPath $dest -Force; throw "$($info.FileName) : SHA256 différent du manifeste winget. Fichier refusé." }
     $sig = 'SHA256 du manifeste winget vérifié'
