@@ -29,9 +29,12 @@ STEP 1 — INSTALL WINDOWS 11 (or another system)
      Shift+F10, type  start ms-cxh:localonly  then Enter.
 
 STEP 2 — SOFTWARE AND SETTINGS (on the Windows desktop)
-  1. Open the key, folder postinstall, double-click Lancer.bat, answer "Yes".
-  2. The window shows each program: already installed / to install.
-     Check what you need, optionally a computer name, click "Install".
+  1. Open the key, folder postinstall, double-click Lancer.bat: the assistant opens
+     in the browser (same assistant as for Linux).
+  2. It shows each program: already installed / on the key / online (winget).
+     Check what you need, optionally a computer name, click "Install" and accept
+     the administrator prompt. Windows is activated with the PC's own licence, if any.
+  Classic window (also "Complete the key" and drivers menu): Lancer.bat -Classique
   3. Wait for the final message (20-40 min with Office). Keep the key plugged in.
   4. Restart the PC.
   "Complete the key (Internet)" button: downloads missing programs ONTO THE KEY.

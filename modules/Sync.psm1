@@ -251,7 +251,8 @@ function New-KitCatalogue {
         if ($pattern) {
             $appDir = Join-Path (Join-Path $KeyRoot $item.TargetDir) 'app'
             $exe = @(Get-ChildItem -LiteralPath $appDir -Filter $pattern -File -Recurse -ErrorAction SilentlyContinue) | Sort-Object Name -Descending | Select-Object -First 1
-            if ($exe) { $launcher = 'app\' + $exe.FullName.Substring($appDir.Length).TrimStart('\') }
+            # Chemin Windows (« \ ») même quand la clé est préparée depuis Linux (« / »)
+            if ($exe) { $launcher = 'app\' + $exe.FullName.Substring($appDir.Length).TrimStart('\', '/').Replace('/', '\') }
         }
         [ordered]@{
             Name         = $item.Name

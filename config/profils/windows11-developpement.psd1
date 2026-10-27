@@ -22,7 +22,8 @@
         @{ Name = 'VSCode'; Category = 'Développement'; Type = 'Winget'; Priority = 3; TargetDir = 'Logiciels/VSCode'
            WingetId = 'Microsoft.VisualStudioCode'; Architecture = 'x64'; Scope = 'machine'; EstimatedSizeMB = 110; Signer = 'Microsoft Corporation'
            SilentArgs = '/VERYSILENT /NORESTART /SP- /MERGETASKS=!runcode,addcontextmenufiles,addcontextmenufolders,associatewithfiles,addtopath'
-           SuccessCodes = @(0); Detection = 'reg:^Microsoft Visual Studio Code'; Order = 100 }
+           SuccessCodes = @(0); Detection = 'reg:^Microsoft Visual Studio Code'; Order = 100
+           PostAction = 'VSCodeExtensions' }
         @{ Name = 'PowerShell7'; Category = 'Développement'; Type = 'Winget'; Priority = 3; TargetDir = 'Logiciels/PowerShell7'
            WingetId = 'Microsoft.PowerShell'; Architecture = 'x64'; InstallerType = 'wix'; EstimatedSizeMB = 110; Signer = 'Microsoft Corporation'
            SilentArgs = '/qn /norestart ADD_PATH=1 ENABLE_PSREMOTING=0 REGISTER_MANIFEST=1'; SuccessCodes = @(0, 3010, 1641)
@@ -42,7 +43,7 @@
 
         # ================================================================== Conteneurs et virtualisation
         @{ Name = 'WSL'; Category = 'Conteneurs'; Type = 'GitHub'; Priority = 3; TargetDir = 'Logiciels/WSL'
-           Repo = 'microsoft/WSL'; AssetPattern = '^wsl\.[\d.]+\.x64\.msi$'; EstimatedSizeMB = 360; Signer = 'Microsoft Corporation'
+           Repo = 'microsoft/WSL'; AssetPattern = '^wsl\.[\d.]+\.x64\.msi$'; EstimatedSizeMB = 360; WingetId = 'Microsoft.WSL'; Signer = 'Microsoft Corporation'
            SilentArgs = '/qn /norestart'; SuccessCodes = @(0, 3010, 1641); Detection = 'reg:^Windows Subsystem for Linux'; Order = 105
            PostAction = 'WSLFeatures' }
         # Docker Desktop : payant pour les administrations et les organisations > 250 salariés ou > 10 M$ de CA

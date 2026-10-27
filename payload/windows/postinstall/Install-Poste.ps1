@@ -11,6 +11,8 @@
       Repli winget seulement si Internet est disponible ET que l'installeur local est absent
       ou a échoué.
     - Installe Office (Microsoft 365 Apps) depuis \Bureautique\Office365 (sauf -SansOffice).
+    - Activation de Windows avec la licence du PC s'il en a une (clé du fabricant dans le
+      firmware, ou licence numérique d'un PC déjà activé) ; sinon simple information.
     - Réglages : extensions de fichiers visibles, pas de mise en veille sur secteur,
       fuseau « Greenwich Standard Time », renommage optionnel, Acrobat Reader par défaut
       pour les PDF, recherche Windows Update si Internet est disponible.
@@ -60,6 +62,7 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+$script:WingetPath = $null   # chemin de winget, résolu au premier repli en ligne (Get-WingetPath)
 
 # --------------------------------------------------------------------------- auto-élévation
 $principal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
@@ -251,6 +254,27 @@ function Invoke-PostAction {
             }
             return 'configuré ; signatures à télécharger dès qu''Internet sera disponible (freshclam.exe)'
         }
+        'VSCodeExtensions' {
+            # Extensions essentielles (Marketplace officielle) : prêtes au premier lancement de VS Code
+            $code = Join-Path $env:ProgramFiles 'Microsoft VS Code\bin\code.cmd'
+            if (-not (Test-Path -LiteralPath $code)) { return '' }
+            if (-not $script:Internet) { return 'extensions à ajouter depuis VS Code (pas d''Internet)' }
+            $ext = @('ms-python.python', 'ms-vscode-remote.remote-containers', 'ms-vscode.powershell', 'editorconfig.editorconfig')
+            if ((Get-UICulture).TwoLetterISOLanguageName -eq 'fr') { $ext = @('ms-ceintl.vscode-language-pack-fr') + $ext }
+            $faites = @()
+            # Windows PowerShell 5.1 : un message sur la sortie d'erreur (avertissement Node.js de VS Code)
+            # deviendrait une erreur bloquante avec ErrorActionPreference = Stop ; seul le code de retour compte
+            $eap = $ErrorActionPreference
+            $ErrorActionPreference = 'Continue'
+            try {
+                foreach ($e in $ext) {
+                    & $code --install-extension $e --force 2>&1 | Out-Null
+                    if ($LASTEXITCODE -eq 0) { $faites += $e }
+                }
+            }
+            finally { $ErrorActionPreference = $eap }
+            return ("extensions : {0}/{1} installées" -f $faites.Count, $ext.Count)
+        }
         'WSLFeatures' {
             # WSL 2 (requis par Podman et Docker Desktop) : fonctionnalités Windows, effectives après redémarrage
             foreach ($feature in 'Microsoft-Windows-Subsystem-Linux', 'VirtualMachinePlatform') {
@@ -269,12 +293,78 @@ function Install-ViaWinget {
     #>
     param([Parameter(Mandatory)] [string] $WingetId)
     if (-not $script:Internet) { return $false }
-    $winget = Get-Command winget -ErrorAction SilentlyContinue
-    if (-not $winget) { Write-Etape -Niveau WARN -Message 'winget indisponible sur ce poste.'; return $false }
+    $winget = Get-WingetPath
+    if (-not $winget) { Write-Etape -Niveau WARN -Message 'winget indisponible sur ce poste (App Installer à mettre à jour depuis le Microsoft Store).'; return $false }
     Write-Etape -Message "Repli en ligne : winget install $WingetId"
-    & $winget.Source install --id $WingetId --exact --silent --source winget --accept-package-agreements --accept-source-agreements --disable-interactivity | Out-Host
-    # 0 = succès ; -1978335189 = déjà installé / aucune mise à jour applicable
-    return ($LASTEXITCODE -in @(0, -1978335189))
+    & $winget install --id $WingetId --exact --silent --source winget --accept-package-agreements --accept-source-agreements --disable-interactivity | Out-Host
+    # 0 = succès ; -1978335189 = aucune mise à jour applicable ; -1978335135 = déjà installé
+    return ($LASTEXITCODE -in @(0, -1978335189, -1978335135))
+}
+
+function Get-WingetPath {
+    <#
+    .SYNOPSIS
+        Chemin de winget, ou '' s'il est absent. Sur un Windows tout juste installé, App Installer
+        n'est enregistré qu'en différé : on l'enregistre (méthode documentée par Microsoft), puis on
+        le cherche aussi hors du PATH (session administrateur).
+    #>
+    if ($null -ne $script:WingetPath) { return $script:WingetPath }
+    $script:WingetPath = ''
+    $cmd = Get-Command winget -ErrorAction SilentlyContinue
+    if (-not $cmd) {
+        try { Add-AppxPackage -RegisterByFamilyName -MainPackage 'Microsoft.DesktopAppInstaller_8wekyb3d8bbwe' -ErrorAction Stop }
+        catch { Write-Verbose ('Enregistrement d''App Installer impossible : {0}' -f $_.Exception.Message) }
+        $cmd = Get-Command winget -ErrorAction SilentlyContinue
+    }
+    if ($cmd) { $script:WingetPath = [string]$cmd.Source; return $script:WingetPath }
+    $candidats = @()
+    if ($env:LOCALAPPDATA) { $candidats += Join-Path $env:LOCALAPPDATA 'Microsoft\WindowsApps\winget.exe' }
+    try {
+        $candidats += @(Get-ChildItem -LiteralPath (Join-Path $env:ProgramFiles 'WindowsApps') -Directory -Filter 'Microsoft.DesktopAppInstaller_*_x64__8wekyb3d8bbwe' -ErrorAction Stop |
+                Sort-Object Name -Descending | ForEach-Object { Join-Path $_.FullName 'winget.exe' })
+    }
+    catch { Write-Verbose 'Dossier WindowsApps illisible.' }
+    $trouve = @($candidats | Where-Object { Test-Path -LiteralPath $_ }) | Select-Object -First 1
+    if ($trouve) { $script:WingetPath = [string]$trouve }
+    return $script:WingetPath
+}
+
+function Invoke-ActivationWindows {
+    <#
+    .SYNOPSIS
+        Active Windows avec la licence DE CE PC, s'il en a une : clé du fabricant inscrite dans le
+        firmware (table MSDM des PC vendus avec Windows) ou licence numérique liée au matériel
+        (PC déjà activé auparavant). Sans licence trouvée : simple information, jamais un échec.
+    .OUTPUTS
+        Hashtable Statut (OK | IGNORÉ), Detail. La clé n'est jamais écrite en clair dans le journal.
+    #>
+    # Portée locale : la sortie d'erreur de slmgr (2>&1) ne doit pas devenir une erreur bloquante (5.1)
+    $ErrorActionPreference = 'Continue'
+    $windowsApp = '55c92734-d682-4d71-983e-d6ec3f16059f'
+    $lire = { @(Get-CimInstance -ClassName SoftwareLicensingProduct -Filter "ApplicationID='$windowsApp' AND PartialProductKey IS NOT NULL" -ErrorAction SilentlyContinue) | Select-Object -First 1 }
+    $produit = & $lire
+    if ($produit -and [int]$produit.LicenseStatus -eq 1) { return @{ Statut = 'OK'; Detail = ("déjà activé ({0})" -f $produit.Name) } }
+    $slmgr = Join-Path $env:WINDIR 'System32\slmgr.vbs'
+    $source = 'licence numérique'
+    $oem = ''
+    try { $oem = [string](Get-CimInstance -ClassName SoftwareLicensingService -ErrorAction Stop).OA3xOriginalProductKey } catch { $oem = '' }
+    if ($oem -and $oem.Length -ge 29) {
+        $source = ('clé du fabricant (firmware, …{0})' -f $oem.Substring($oem.Length - 5))
+        if (-not $produit -or [string]$produit.PartialProductKey -ne $oem.Substring($oem.Length - 5)) {
+            # Sortie capturée et non affichée : slmgr répète la clé
+            $sortie = (& cscript.exe //nologo $slmgr /ipk $oem 2>&1 | Out-String) -replace [regex]::Escape($oem), '*****'
+            if ($LASTEXITCODE -ne 0 -or $sortie -match '0x[0-9A-F]{8}') {
+                return @{ Statut = 'IGNORÉ'; Detail = ("la clé du fabricant correspond à une autre édition de Windows (souvent Famille) : installer cette édition, ou Paramètres > Système > Activation ({0})" -f ([string]($sortie -split "`r?`n" | Where-Object { $_ -match '0x' } | Select-Object -First 1)).Trim()) }
+            }
+        }
+    }
+    if (-not $script:Internet) { return @{ Statut = 'IGNORÉ'; Detail = ("pas d'Internet : Windows s'activera seul à la première connexion ({0})" -f $source) } }
+    $sortie = & cscript.exe //nologo $slmgr /ato 2>&1 | Out-String
+    $produit = & $lire
+    if ($produit -and [int]$produit.LicenseStatus -eq 1) { return @{ Statut = 'OK'; Detail = ("activé : {0}" -f $source) } }
+    if (-not $oem) { return @{ Statut = 'IGNORÉ'; Detail = 'aucune licence trouvée pour ce PC (ni clé du fabricant, ni licence numérique) : Paramètres > Système > Activation pour saisir une clé' } }
+    $code = [regex]::Match($sortie, '0x[0-9A-F]{8}').Value
+    return @{ Statut = 'IGNORÉ'; Detail = ("activation non confirmée ({0}) : Windows réessaie seul ; sinon Paramètres > Système > Activation" -f $(if ($code) { $code } else { 'serveurs Microsoft' })) }
 }
 
 function Get-SystemeLinuxDemarrage {
@@ -439,8 +529,11 @@ try {
                     $code = Invoke-Installeur -Fichier (Join-Path $dossier 'setup.exe') -Arguments ('/configure "{0}"' -f (Join-Path $dossier 'config.xml')) -Nom $nom -Dossier $dossier
                     if ($code -eq 0) { $ok = $true; $detail += ' ; installé avec le complément en ligne' }
                 }
-                elseif ($wid -and (Install-ViaWinget -WingetId $wid)) { $ok = $true; $detail += ' ; installé en ligne via winget' }
-                elseif (-not $script:Internet) { $detail += ' ; pas d''Internet pour le repli winget' }
+                if (-not $ok) {
+                    if ($wid -and (Install-ViaWinget -WingetId $wid)) { $ok = $true; $detail += ' ; installé en ligne via winget' }
+                    elseif (-not $script:Internet) { $detail += ' ; pas d''Internet pour le repli winget' }
+                    elseif (-not $wid) { $detail += ' ; aucun identifiant winget pour un repli en ligne' }
+                }
             }
             if ($ok) {
                 $post = [string](Get-Prop $e 'PostAction' '')
@@ -546,6 +639,10 @@ try {
             }
             catch { Add-Bilan -Nom 'Renommage' -Statut 'ÉCHEC' -Detail $_.Exception.Message }
         }
+
+        # Activation avec la licence du PC (clé du fabricant ou licence numérique), si elle existe
+        try { $act = Invoke-ActivationWindows; Add-Bilan -Nom 'Activation de Windows' -Statut $act.Statut -Detail $act.Detail }
+        catch { Add-Bilan -Nom 'Activation de Windows' -Statut 'IGNORÉ' -Detail ("vérification impossible : {0}" -f $_.Exception.Message) }
 
         # Windows Update (uniquement si Internet)
         if ($script:Internet) {

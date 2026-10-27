@@ -90,4 +90,49 @@ function Get-KitProfileList {
     return , @($list | Sort-Object Systeme, Ordre, Name)
 }
 
-Export-ModuleMember -Function Copy-KitHashtable, Get-KitProfile, Get-KitProfileList
+function ConvertTo-KitTimeZone {
+    <#
+    .SYNOPSIS
+        Convertit un fuseau horaire entre l'identifiant Windows (« Romance Standard Time ») et
+        l'identifiant IANA de Linux (« Europe/Paris »). Clé double système : chaque système reçoit
+        le format qu'il comprend (un fuseau invalide fait échouer l'installation automatique de Windows).
+    .OUTPUTS
+        L'identifiant converti, ou '' s'il est inconnu (fuseau laissé au choix du système).
+    #>
+    [CmdletBinding()]
+    [OutputType([string])]
+    param(
+        [Parameter(Mandatory)] [AllowEmptyString()] [string] $Id,
+        [Parameter(Mandatory)] [ValidateSet('Windows', 'Iana')] [string] $To
+    )
+    if (-not $Id) { return '' }
+    $isIana = ($Id -match '/' -or $Id -eq 'UTC' -or $Id -like 'Etc/*')
+    if ($To -eq 'Iana' -and $isIana) { return $Id }
+    if ($To -eq 'Windows' -and -not $isIana) { return $Id }
+    # Table de secours (Windows PowerShell 5.1 n'a pas la conversion .NET) : fuseaux courants
+    $table = @{
+        'Greenwich Standard Time' = 'Africa/Abidjan'; 'GMT Standard Time' = 'Europe/London'; 'UTC' = 'Etc/UTC'
+        'Romance Standard Time' = 'Europe/Paris'; 'W. Europe Standard Time' = 'Europe/Berlin'
+        'W. Central Africa Standard Time' = 'Africa/Lagos'; 'Morocco Standard Time' = 'Africa/Casablanca'
+        'E. Africa Standard Time' = 'Africa/Nairobi'; 'South Africa Standard Time' = 'Africa/Johannesburg'
+        'Eastern Standard Time' = 'America/New_York'; 'Pacific Standard Time' = 'America/Los_Angeles'
+        'Central Standard Time' = 'America/Chicago'; 'E. South America Standard Time' = 'America/Sao_Paulo'
+        'SA Pacific Standard Time' = 'America/Bogota'; 'Canada Central Standard Time' = 'America/Regina'
+    }
+    $converted = ''
+    try {
+        if ($To -eq 'Iana') { [void][TimeZoneInfo]::TryConvertWindowsIdToIanaId($Id, [ref]$converted) }
+        else { [void][TimeZoneInfo]::TryConvertIanaIdToWindowsId($Id, [ref]$converted) }
+    }
+    catch { $converted = '' }
+    if ($converted) { return [string]$converted }
+    if ($To -eq 'Iana') {
+        if ($table.ContainsKey($Id)) { return $table[$Id] }
+        return ''
+    }
+    foreach ($k in $table.Keys) { if ($table[$k] -eq $Id) { return $k } }
+    if ($Id -eq 'Etc/UTC') { return 'UTC' }
+    return ''
+}
+
+Export-ModuleMember -Function Copy-KitHashtable, Get-KitProfile, Get-KitProfileList, ConvertTo-KitTimeZone

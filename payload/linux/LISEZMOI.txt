@@ -21,8 +21,11 @@ CONTENU DE LA CLÉ
   1. Ouvrir la clé dans le gestionnaire de fichiers, dossier « linux ».
   2. Clic droit dans le dossier → « Ouvrir dans un terminal », puis taper :
         bash lancer.sh
-  3. Choisir l'usage (bureautique / développement), cocher les logiciels, valider.
+  3. L'assistant s'ouvre dans le navigateur (même assistant que pour Windows) :
+     choisir l'usage (bureautique / développement), cocher les logiciels, « Installer ».
      Le mot de passe de l'utilisateur est demandé (droits administrateur).
+     Développement : VS Code est installé avec ses extensions essentielles.
+     Fenêtres classiques : bash lancer.sh --zenity
   4. À la fin, redémarrer.
   Sans fenêtre :  sudo bash installer-poste.sh -u developpement -y
   Simulation  :   bash installer-poste.sh -u developpement -n -y

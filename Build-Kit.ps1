@@ -376,13 +376,23 @@ try {
         }
     }
 
-    # Éléments propres à Windows (winget, Office Deployment Tool) : à préparer depuis Windows
-    $windowsOnly = @($items | Where-Object { $_.Type -in @('Winget', 'Office') })
-    if ($windowsOnly.Count -gt 0 -and -not (Test-KitWindows)) {
-        throw ("Ces éléments se préparent depuis Windows (winget / Office Deployment Tool) : {0}. Depuis Linux, choisissez un profil Linux ou décochez-les." -f (($windowsOnly | ForEach-Object Name) -join ', '))
+    # Clé Windows préparée depuis Linux : les logiciels winget viennent des manifestes publics de winget
+    # (URL de l'éditeur, SHA256 vérifié) et vont sur la clé. Restent installés EN LIGNE sur le poste :
+    # Office (l'Office Deployment Tool n'existe que sous Windows) et les fichiers sans empreinte publiée
+    # (seule la signature Authenticode, invérifiable sous Linux, prouverait leur origine).
+    $onTarget = 'à installer en ligne sur le poste (winget) : clé préparée depuis Linux'
+    $deferToTarget = {
+        param($it)
+        if (Test-KitWindows) { return $false }
+        if ($it.Type -eq 'Office') { return $true }
+        if ($it.Type -eq 'Url') { return (@($it.Files | Where-Object { -not (Get-KitValue $_ 'Sha256' '') }).Count -gt 0) }
+        return $false
     }
-    if (-not $SkipDownload -and @($items | Where-Object { $_.Type -eq 'Winget' }).Count -gt 0 -and -not (Initialize-KitWinget)) {
-        throw "winget est introuvable. Installez « App Installer » depuis le Microsoft Store (ou relancez l'assistant sans droits administrateur), ou utilisez -SkipDownload."
+    if (-not (Test-KitWindows) -and $config.Systeme -eq 'Windows') {
+        Write-KitLog -Level WARN -Message 'Clé Windows préparée depuis Linux : ISO et logiciels sur la clé (manifestes winget, SHA256 vérifiés) ; Office et les rares fichiers sans empreinte publiée seront installés en ligne par la post-installation (Internet requis sur le poste pour ceux-là).'
+    }
+    if (-not $SkipDownload -and (Test-KitWindows) -and @($items | Where-Object { $_.Type -eq 'Winget' }).Count -gt 0 -and -not (Initialize-KitWinget)) {
+        Write-KitLog -Level WARN -Message "winget est introuvable : les logiciels sont pris dans les manifestes publics de winget (même source, SHA256 vérifié). Pour winget : « App Installer » du Microsoft Store."
     }
     # ------------------------------------------------------------------ 2. sources
     $phase = 'resolve'
@@ -392,8 +402,18 @@ try {
     foreach ($it in $items) {
         $plan = New-KitPlan -Item $it -Index $index
         $index++
+        if (& $deferToTarget $it) {
+            $plan.Status = 'EN_LIGNE'; $plan.Detail = $onTarget
+            Write-KitLog -Message ("{0,-16} {1}" -f $plan.Name, $onTarget)
+            $plans += $plan
+            continue
+        }
         try {
             Resolve-KitPlan -Plan $plan -KeyRoot $keyRoot -CacheRoot $cacheRoot -ToolsDir $toolsDir -FidoUrl $config.FidoUrl -Manifest $manifest -WindowsIsoUrl $WindowsIsoUrl -SkipDownload:$SkipDownload
+            # Release GitHub sans SHA256 publié : seule la signature prouverait l'origine (invérifiable ici)
+            if (-not (Test-KitWindows) -and $it.Type -eq 'GitHub' -and $plan.Status -eq 'A_TELECHARGER' -and $plan.Source -and -not $plan.Source.Sha256) {
+                $plan.Status = 'EN_LIGNE'; $plan.Detail = "$onTarget (aucun SHA256 publié)"
+            }
             Write-KitLog -Message ("{0,-16} {1,-14} {2,-12} {3}" -f $plan.Name, $plan.Status, (Format-KitSize $plan.NewBytes), $plan.Version)
         }
         catch {
@@ -508,7 +528,12 @@ try {
             }
         }
         catch {
-            Add-KitResult -Name $p.Name -Status 'ÉCHEC' -Detail $_.Exception.Message
+            # Source « manifeste winget » refusée par l'éditeur (téléchargement direct interdit, 403…) :
+            # le logiciel reste au catalogue et la post-installation l'installe en ligne (winget)
+            if ($p.Source -and $p.Source.PSObject.Properties['Manifest'] -and $_.Exception.Message -match '403|404|page web') {
+                Add-KitResult -Name $p.Name -Status 'IGNORÉ' -Detail ("téléchargement direct refusé par l'éditeur : installé en ligne sur le poste (winget) — {0}" -f $_.Exception.Message)
+            }
+            else { Add-KitResult -Name $p.Name -Status 'ÉCHEC' -Detail $_.Exception.Message }
         }
     }
 
@@ -523,24 +548,46 @@ try {
         $gen = Join-Path $cacheRoot '_kit'
         if (Test-Path -LiteralPath $gen) { Remove-Item -LiteralPath $gen -Recurse -Force }
         New-Item -ItemType Directory -Path $gen -Force | Out-Null
-        $payload = Join-Path $kitRoot $(if ($config.ContainsKey('Payload')) { $config.Payload } else { 'payload/windows' })
-        Copy-Item -Path (Join-Path $payload '*') -Destination $gen -Recurse -Force
+        # Clé double système : la post-installation de CHAQUE système présent sur la clé est embarquée
+        # (clé Windows avec Ubuntu => dossier linux/ ; clé Linux avec Windows 11 => postinstall/ et ventoy/)
+        # (copiée en dernier, la post-installation du système principal garde son LISEZMOI)
+        $mainPayload = $(if ($config.ContainsKey('Payload')) { $config.Payload } else { 'payload/windows' })
+        $onKey = @($plans | Where-Object { $_.Decision -in @('ACCEPTÉ', 'À JOUR') } | ForEach-Object { $_.Item.Type })
+        # ISO déjà sur la clé (préparation précédente, éventuellement depuis l'autre système) comprises
+        $managedIsos = @($manifest.Keys | Where-Object { $_ -match '\.iso$' })
+        $payloadRels = @()
+        if ($onKey -contains 'LinuxIso' -or @($managedIsos | Where-Object { $_ -like 'ISO/Linux/*' }).Count -gt 0) { $payloadRels += 'payload/linux' }
+        if ($onKey -contains 'WindowsIso' -or @($managedIsos | Where-Object { $_ -match '^ISO/Windows[^/]*\.iso$' }).Count -gt 0) { $payloadRels += 'payload/windows' }
+        $payloadRels = @($payloadRels | Where-Object { $_ -ne $mainPayload }) + @($mainPayload)
+        foreach ($rel in $payloadRels) {
+            Copy-Item -Path (Join-Path (Join-Path $kitRoot $rel) '*') -Destination $gen -Recurse -Force
+        }
+        # Assistant universel (même page que pour créer la clé) à côté de chaque post-installation
+        $page = Join-Path $kitRoot 'web/alchemist.html'
+        foreach ($sub in @('postinstall', 'linux')) {
+            if ((Test-Path -LiteralPath $page) -and (Test-Path -LiteralPath (Join-Path $gen $sub))) { Copy-Item -LiteralPath $page -Destination (Join-Path $gen $sub) -Force }
+        }
         # Scripts Linux : fins de ligne LF, même si la copie du kit les a converties en CRLF
         # (Git pour Windows, archive décompressée par un outil Windows) ; bash échouerait sinon
-        foreach ($sh in @(Get-ChildItem -LiteralPath $gen -Recurse -File -Include '*.sh')) {
+        # (filtre par extension : sous Windows PowerShell 5.1, -Include est ignoré avec -LiteralPath)
+        foreach ($sh in @(Get-ChildItem -LiteralPath $gen -Recurse -File | Where-Object { $_.Extension -eq '.sh' })) {
             $texte = [IO.File]::ReadAllText($sh.FullName)
             if ($texte.Contains("`r")) { [IO.File]::WriteAllText($sh.FullName, $texte.Replace("`r`n", "`n"), (New-Object Text.UTF8Encoding($false))) }
         }
         $tz = 'Greenwich Standard Time'
         if ($config.ContainsKey('TimeZone')) { $tz = $config.TimeZone }
+        # Chaque post-installation reçoit le format de son système (clé double système)
+        $tzWindows = ConvertTo-KitTimeZone -Id $tz -To Windows
+        if (-not $tzWindows) { $tzWindows = 'Greenwich Standard Time' }
+        $tzLinux = ConvertTo-KitTimeZone -Id $tz -To Iana
         if (Test-Path -LiteralPath (Join-Path $gen 'postinstall')) {
             # Windows : version embarquée et catalogue de la post-installation
             [IO.File]::WriteAllText((Join-Path $gen 'postinstall/VERSION'), "$kitVersion`n", (New-Object Text.UTF8Encoding($false)))
-            [void](New-KitCatalogue -Items $allItems -KeyRoot $keyRoot -Destination (Join-Path $gen 'postinstall/catalogue.json') -ProfileName $Profil -TimeZone $tz -DevDrive ($config.ContainsKey('DevDrive') -and [bool]$config.DevDrive))
+            [void](New-KitCatalogue -Items $allItems -KeyRoot $keyRoot -Destination (Join-Path $gen 'postinstall/catalogue.json') -ProfileName $Profil -TimeZone $tzWindows -DevDrive ($config.ContainsKey('DevDrive') -and [bool]$config.DevDrive))
         }
         if (Test-Path -LiteralPath (Join-Path $gen 'linux')) {
             # Linux : profil d'usage lu par le script de post-installation
-            $conf = @("KIT_VERSION=$kitVersion", "KIT_PROFIL=$Profil", "KIT_USAGE=$($config.Usage)", "KIT_LANGUE=$Langue", "KIT_TZ=$tz")
+            $conf = @("KIT_VERSION=$kitVersion", "KIT_PROFIL=$Profil", "KIT_USAGE=$($config.Usage)", "KIT_LANGUE=$Langue", "KIT_TZ=$tzLinux")
             [IO.File]::WriteAllText((Join-Path $gen 'linux/kit.conf'), (($conf -join "`n") + "`n"), (New-Object Text.UTF8Encoding($false)))
         }
 
@@ -552,10 +599,10 @@ try {
             '{{ISO_NAME_W10}}' = $(if ($iso10Item) { [string]$iso10Item.FileName } else { 'Windows10_x64.iso' })
             '{{UI_LANG}}'      = $(if ($langInfo) { $langInfo.UILang } else { 'fr-FR' })
             '{{INPUT_LOCALE}}' = $(if ($langInfo) { $langInfo.InputLocale } else { '040c:0000040c' })
-            '{{TIMEZONE}}'     = $tz
+            '{{TIMEZONE}}'     = $tzWindows
             '{{KIT_VERSION}}'  = $kitVersion
         }
-        foreach ($tf in @(Get-ChildItem -LiteralPath $gen -Recurse -File -Include '*.xml', '*.json', '*.txt', '*.md')) {
+        foreach ($tf in @(Get-ChildItem -LiteralPath $gen -Recurse -File | Where-Object { $_.Extension -in @('.xml', '.json', '.txt', '.md') })) {
             $content = [IO.File]::ReadAllText($tf.FullName)
             if ($content -notmatch '\{\{[A-Z0-9_]+\}\}') { continue }
             foreach ($k in $tokens.Keys) { $content = $content.Replace($k, $tokens[$k]) }

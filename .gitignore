@@ -13,3 +13,5 @@ logs/
 *.exe
 *.zip
 *.cab
+# Cache Python (ne doit pas partir sur la clé)
+__pycache__/

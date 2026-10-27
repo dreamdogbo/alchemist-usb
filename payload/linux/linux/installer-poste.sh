@@ -19,7 +19,7 @@
 set -Eeuo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-KIT_VERSION="dev"; KIT_USAGE=""; KIT_TZ=""
+KIT_VERSION="dev"; KIT_USAGE=""; KIT_TZ=""; KIT_LANGUE=""
 # shellcheck disable=SC1091
 [ -f "$SCRIPT_DIR/kit.conf" ] && . "$SCRIPT_DIR/kit.conf"
 
@@ -100,7 +100,7 @@ while [ $# -gt 0 ]; do
     *) echo "Option inconnue : $1" >&2; aide; exit 2 ;;
   esac
 done
-USAGE_CHOISI="$(echo "${USAGE_CHOISI:-bureautique}" | tr '[:upper:]' '[:lower:]' | sed 's/é/e/g')"
+USAGE_CHOISI="$(echo "${USAGE_CHOISI:-bureautique}" | tr '[:upper:]' '[:lower:]' | sed 's/[éÉ]/e/g')"
 case "$USAGE_CHOISI" in bureautique|developpement) ;; *) echo "Usage inconnu : $USAGE_CHOISI" >&2; exit 2 ;; esac
 
 if [ "$LISTE" -eq 1 ] && [ "$TSV" -eq 1 ]; then
@@ -108,11 +108,13 @@ if [ "$LISTE" -eq 1 ] && [ "$TSV" -eq 1 ]; then
   for c in "${COMPOSANTS[@]}"; do IFS='|' read -r id lib cat db dd <<<"$c"; printf '%s\t%s\t%s\t%s\t%s\n' "$id" "$cat" "$db" "$dd" "$lib"; done
   exit 0
 fi
+# Texte complété par des espaces jusqu'à N caractères (printf compte les octets : « é » en vaut 2)
+colonne() { local t="$1" n="$2"; printf '%s%*s' "$t" "$(( n > ${#t} ? n - ${#t} : 0 ))" ''; }
 if [ "$LISTE" -eq 1 ]; then
-  printf '%-15s %-16s %-4s %-4s %s\n' "COMPOSANT" "CATÉGORIE" "BUR." "DEV." "DESCRIPTION"
+  echo "$(colonne COMPOSANT 15) $(colonne CATÉGORIE 16) BUR. DEV. DESCRIPTION"
   for c in "${COMPOSANTS[@]}"; do
     IFS='|' read -r id lib cat db dd <<<"$c"
-    printf '%-15s %-16s %-4s %-4s %s\n' "$id" "$cat" "$([ "$db" = 1 ] && echo oui || echo -)" "$([ "$dd" = 1 ] && echo oui || echo -)" "$lib"
+    echo "$(colonne "$id" 15) $(colonne "$cat" 16) $(colonne "$([ "$db" = 1 ] && echo oui || echo -)" 4) $(colonne "$([ "$dd" = 1 ] && echo oui || echo -)" 4) $lib"
   done
   exit 0
 fi
@@ -144,7 +146,9 @@ case " ${ID:-} ${ID_LIKE:-} " in
   *) echo "Distribution non prise en charge : ${PRETTY_NAME:-$DISTRO} (familles Debian/Ubuntu et Fedora)." >&2; exit 4 ;;
 esac
 # Dépôts tiers : codename Ubuntu pour Ubuntu et Mint (UBUNTU_CODENAME), Debian pour Debian
+# (LMDE, Linux Mint Debian Edition : ID=linuxmint sans UBUNTU_CODENAME, base DEBIAN_CODENAME)
 if [ "$DISTRO" = "debian" ]; then UPSTREAM="debian"; CODENAME="${VERSION_CODENAME:-trixie}"
+elif [ "$FAMILLE" = "deb" ] && [ -z "${UBUNTU_CODENAME:-}" ] && [ -n "${DEBIAN_CODENAME:-}" ]; then UPSTREAM="debian"; CODENAME="$DEBIAN_CODENAME"
 else UPSTREAM="ubuntu"; CODENAME="${UBUNTU_CODENAME:-${VERSION_CODENAME:-noble}}"; fi
 ARCH="$(uname -m)"; DEB_ARCH="amd64"; [ "$ARCH" = "aarch64" ] && DEB_ARCH="arm64"
 TMP="$(mktemp -d)"
@@ -607,6 +611,10 @@ comp_vscode() {
     depot_apt vscode "$CLE_MS" "deb [arch=amd64,arm64,armhf signed-by=@CLE@] https://packages.microsoft.com/repos/code stable main"
   else depot_microsoft_rpm vscode vscode; fi
   paquets "code" "code"
+  # Extensions essentielles pour l'utilisateur (Marketplace officielle) : prêtes au premier lancement
+  local ext="ms-python.python ms-vscode-remote.remote-containers editorconfig.editorconfig"
+  case "${KIT_LANGUE:-${LANG:-}}" in fr*) ext="ms-ceintl.vscode-language-pack-fr $ext" ;; esac
+  en_utilisateur "for e in $ext; do code --install-extension \$e --force >/dev/null 2>&1 && echo \"  extension VS Code : \$e\" || echo \"  extension VS Code non installée : \$e (à ajouter depuis VS Code)\"; done" || true
 }
 
 comp_docker() {
@@ -693,7 +701,7 @@ comp_python() {
 comp_node() {
   local tag
   tag="$(github_tag nvm-sh/nvm)"; [ -z "$tag" ] && { jaune "  nvm : version introuvable"; return 1; }
-  en_utilisateur "export NVM_DIR=\"\$HOME/.nvm\"; [ -s \"\$NVM_DIR/nvm.sh\" ] || curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/$tag/install.sh | bash; . \"\$NVM_DIR/nvm.sh\"; nvm install --lts && nvm alias default 'lts/*' && corepack enable"
+  en_utilisateur "export NVM_DIR=\"\$HOME/.nvm\"; [ -s \"\$NVM_DIR/nvm.sh\" ] || curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/$tag/install.sh | bash; . \"\$NVM_DIR/nvm.sh\"; nvm install --lts && nvm alias default 'lts/*' && { command -v corepack >/dev/null 2>&1 || npm install -g corepack; } && corepack enable"
 }
 
 comp_java() {
@@ -706,12 +714,21 @@ comp_java() {
 }
 
 comp_dotnet() {
+  # Ubuntu et Fedora publient le SDK dans leurs dépôts ; Debian (et LMDE) : dépôt officiel Microsoft
+  if [ "$UPSTREAM" = "debian" ]; then
+    local vdeb; vdeb="$(cut -d. -f1 /etc/debian_version 2>/dev/null)"
+    case "$vdeb" in ''|*[!0-9]*) vdeb=13 ;; esac
+    # Paquet officiel de configuration : il installe la bonne clé (Debian 13 : clé Microsoft 2025) et la source
+    fichier_paquet packages-microsoft-prod "https://packages.microsoft.com/config/debian/$vdeb/packages-microsoft-prod.deb" packages-microsoft-prod
+    PAQ_A_JOUR=0
+  fi
   paq_maj
   local v
   for v in 10.0 9.0 8.0; do
     if paq_existe "dotnet-sdk-$v"; then paquets "dotnet-sdk-$v" "dotnet-sdk-$v"; return 0; fi
   done
-  jaune "  .NET SDK : aucun paquet officiel trouvé pour $DISTRO"
+  if [ "$SIMULATION" -eq 1 ]; then echo "  [simulation] dotnet-sdk-10.0"; return 0; fi
+  rouge "  .NET SDK : aucun paquet officiel trouvé pour $DISTRO"; return 1
 }
 
 comp_go() {
@@ -828,11 +845,16 @@ else
       args+=("$id" "[$cat] $lib" "$etat")
     done
     if choix="$(whiptail --title "Alchemist — ${PRETTY_NAME:-Linux} ($USAGE_CHOISI)" --separate-output \
-        --checklist "Espace : cocher/décocher — Entrée : valider" 30 110 22 "${args[@]}" 3>&1 1>&2 2>&3)"; then
+        --checklist "Espace : cocher/décocher — Entrée : valider" 30 110 22 "${args[@]}" 3>&1 1>/dev/tty 2>&3)"; then
       mapfile -t SELECTION <<<"$choix"
     else
       echo "Annulé."; exit 1
     fi
+  elif [ "$OUI" -eq 0 ] && [ -t 0 ]; then
+    # Pas de menu possible (whiptail absent) : on montre la sélection et on demande confirmation
+    echo "Composants prévus (usage $USAGE_CHOISI) : ${SELECTION[*]}"
+    read -rp "Installer ces composants ? [O/n] " reponse </dev/tty
+    case "$reponse" in [nN]*) echo "Annulé (choisissez avec -c id1,id2 ; voir --liste)."; exit 1 ;; esac
   fi
 fi
 

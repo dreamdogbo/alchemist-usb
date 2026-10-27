@@ -6,6 +6,8 @@ REM
 REM  Le lanceur (modules\Lanceur.ps1) affiche un message clair si
 REM  la fenetre ne peut pas s'ouvrir, au lieu d'echouer en silence.
 REM  Depannage : Creer-Cle.bat -Console (garde la console ouverte)
+REM  Fenetre classique : Creer-Cle.bat -Classique
+REM  (par defaut : assistant universel dans le navigateur, identique sous Linux)
 REM ============================================================
 setlocal
 cd /d "%~dp0" 2>nul
@@ -20,6 +22,10 @@ if not exist "%PS%" set "PS=powershell.exe"
 if /i "%~1"=="-Console" (
     "%PS%" -NoProfile -ExecutionPolicy Bypass -STA -File "%~dp0modules\Lanceur.ps1" -Console
     pause
+    exit /b
+)
+if /i "%~1"=="-Classique" (
+    start "" "%PS%" -NoProfile -ExecutionPolicy Bypass -STA -WindowStyle Hidden -File "%~dp0modules\Lanceur.ps1" -Classique
     exit /b
 )
 start "" "%PS%" -NoProfile -ExecutionPolicy Bypass -STA -WindowStyle Hidden -File "%~dp0modules\Lanceur.ps1"

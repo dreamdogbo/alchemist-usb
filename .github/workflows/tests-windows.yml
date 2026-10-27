@@ -1,0 +1,216 @@
+name: Tests Windows
+
+# Essais RÉELS sur une machine Windows (GitHub Actions) : préparation d'une clé Ventoy factice
+# (disque virtuel exFAT « Ventoy » + VTOYEFI), vrais téléchargements vérifiés, post-installation
+# réelle depuis cette clé, assistants universels (création et poste) sous Windows PowerShell 5.1.
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  windows:
+    name: Clé et post-installation sous Windows
+    runs-on: windows-latest
+    timeout-minutes: 60
+    env:
+      GITHUB_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Tests du moteur (Windows PowerShell 5.1)
+        shell: powershell
+        run: .\tests\moteur\Test-Moteur.ps1
+
+      - name: Tests du moteur (PowerShell 7)
+        shell: pwsh
+        run: ./tests/moteur/Test-Moteur.ps1
+
+      - name: Clé Ventoy factice (disque virtuel exFAT « Ventoy » + VTOYEFI, lettre V:)
+        shell: powershell
+        run: |
+          $script = "$env:RUNNER_TEMP\cle.txt"
+          @(
+            "create vdisk file=`"$env:RUNNER_TEMP\cle.vhdx`" maximum=12288 type=expandable",
+            'attach vdisk', 'convert mbr',
+            'create partition primary size=12200', 'format fs=exfat label=Ventoy quick', 'assign letter=V',
+            'create partition primary', 'format fs=fat label=VTOYEFI quick'
+          ) | Set-Content -LiteralPath $script -Encoding ASCII
+          diskpart /s $script
+          if ($LASTEXITCODE -ne 0) { throw "diskpart : code $LASTEXITCODE" }
+          Get-Volume -DriveLetter V | Format-List DriveLetter, FileSystemLabel, FileSystem, SizeRemaining
+          New-Item -ItemType Directory V:\Perso -Force | Out-Null
+          Set-Content V:\Perso\notes.txt 'mes notes'
+
+      - name: Préparation RÉELLE de la clé (Windows 11 développement, sans l'ISO)
+        shell: powershell
+        run: |
+          $only = 'Chocolatey,Win7_WMF51,7Zip,VSCode'
+          if (-not (Get-Command winget -ErrorAction SilentlyContinue)) { Write-Warning 'winget absent du poste de test : éléments winget retirés'; $only = 'Chocolatey,Win7_WMF51' }
+          .\Build-Kit.ps1 -Profil windows11-developpement -Only $only -DriveLetter V
+          if ($LASTEXITCODE -ne 0) { throw "Build-Kit : code $LASTEXITCODE" }
+          Get-ChildItem V:\ -Recurse -File | Where-Object FullName -notmatch '\\kit-cache\\' | Select-Object -First 40 FullName, Length | Format-Table -AutoSize
+          # MANIFEST : chaque fichier géré a l'empreinte annoncée
+          $bad = 0
+          foreach ($l in Get-Content V:\MANIFEST.sha256) {
+            if ($l -match '^([0-9a-f]{64}) \*(.+)$') { if ((Get-FileHash -LiteralPath (Join-Path 'V:\' $Matches[2]) -Algorithm SHA256).Hash.ToLower() -ne $Matches[1]) { $bad++; "Empreinte fausse : $($Matches[2])" } }
+          }
+          if ($bad) { throw "$bad fichier(s) du MANIFEST incorrect(s)" }
+          if ((Get-Content V:\Perso\notes.txt) -ne 'mes notes') { throw 'Fichier personnel modifié' }
+          foreach ($f in 'postinstall\Install-Poste.ps1', 'postinstall\Assistant-Poste-Web.ps1', 'postinstall\alchemist.html', 'postinstall\catalogue.json', 'ventoy\ventoy.json') { if (-not (Test-Path "V:\$f")) { throw "$f absent de la clé" } }
+
+      - name: Relance (rien à retélécharger)
+        shell: powershell
+        run: |
+          $log = "$env:RUNNER_TEMP\relance.log"
+          .\Build-Kit.ps1 -Profil windows11-developpement -Only Chocolatey,Win7_WMF51 -DriveLetter V -LogFile $log
+          if ($LASTEXITCODE -ne 0) { throw "code $LASTEXITCODE" }
+          if (-not (Select-String -LiteralPath $log -Pattern 'd\u00e9j\u00e0 \u00e0 jour' -Quiet)) { throw 'Éléments retéléchargés' }
+
+      - name: Post-installation RÉELLE depuis la clé (Chocolatey, 7-Zip, VS Code)
+        shell: powershell
+        run: |
+          $log = "$env:RUNNER_TEMP\poste.log"
+          & V:\postinstall\Install-Poste.ps1 -Logiciels Chocolatey,7Zip,VSCode -SansReglages -Journal $log
+          Get-Content -LiteralPath $log -Tail 30
+          if (-not (Test-Path "$env:ProgramData\chocolatey\choco.exe")) { throw 'Chocolatey non installé' }
+          if (Select-String -LiteralPath $log -Pattern 'configuration compl\u00e9mentaire en \u00e9chec' -Quiet) { throw 'Action complementaire en echec (voir le journal)' }
+          $vs = Join-Path $env:ProgramFiles 'Microsoft VS Code\bin\code.cmd'
+          if (Test-Path $vs) { $x = & cmd.exe /c "`"$vs`" --list-extensions 2>nul"; $x; if (-not ($x -match 'ms-python.python')) { throw 'Extensions VS Code absentes' } }
+          & "$env:ProgramData\chocolatey\choco.exe" --version
+
+      - name: Assistant universel de création (Windows PowerShell 5.1)
+        shell: powershell
+        run: |
+          $p = Start-Process powershell.exe -ArgumentList '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', '.\Assistant-Web.ps1', '-SansNavigateur', '-Port', '18765', '-Jeton', 'ci', '-Simuler' -PassThru -WindowStyle Hidden
+          $h = @{ 'X-Alchemist-Jeton' = 'ci' }
+          for ($i = 0; $i -lt 60; $i++) { try { Invoke-WebRequest http://127.0.0.1:18765/ -UseBasicParsing | Out-Null; break } catch { Start-Sleep 1 } }
+          try { Invoke-RestMethod http://127.0.0.1:18765/api/etat; throw 'API accessible sans jeton' } catch { if ($_.Exception.Message -eq 'API accessible sans jeton') { throw } }
+          $e = Invoke-RestMethod http://127.0.0.1:18765/api/etat -Headers $h
+          if ($e.mode -ne 'creer' -or $e.hote -ne 'Windows') { throw "état inattendu : $($e | ConvertTo-Json -Compress)" }
+          $pr = (Invoke-RestMethod http://127.0.0.1:18765/api/profils -Headers $h).profils
+          if (@($pr).Count -ne 4) { throw "profils : $(@($pr).Count)" }
+          $k = Invoke-RestMethod http://127.0.0.1:18765/api/cles -Headers $h
+          $k | ConvertTo-Json -Depth 4
+          if (-not (@($k.ventoy) | Where-Object Root -eq 'V:\')) { throw 'Clé V: non détectée' }
+          $body = @{ profil = 'windows11-bureautique'; elements = @('Firefox', 'Chocolatey'); langue = 'en'; cle = @{ mode = 'existante'; racine = 'V:\' } } | ConvertTo-Json -Depth 4
+          Invoke-RestMethod http://127.0.0.1:18765/api/lancer -Method Post -Headers $h -Body $body -ContentType 'application/json'
+          for ($i = 0; $i -lt 180; $i++) { $j = Invoke-RestMethod 'http://127.0.0.1:18765/api/journal?depuis=0' -Headers $h; if (-not $j.actif) { break }; Start-Sleep 1 }
+          $j.lignes | Select-Object -Last 15
+          if ($j.actif -or $j.code -ne 0) { throw "simulation : code $($j.code)" }
+          Stop-Process -Id $p.Id -Force
+
+      - name: Assistant universel de post-installation (Windows PowerShell 5.1, depuis la clé)
+        shell: powershell
+        run: |
+          $p = Start-Process powershell.exe -ArgumentList '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', 'V:\postinstall\Assistant-Poste-Web.ps1', '-SansNavigateur', '-Port', '18766', '-Jeton', 'ci' -PassThru -WindowStyle Hidden
+          $h = @{ 'X-Alchemist-Jeton' = 'ci' }
+          for ($i = 0; $i -lt 60; $i++) { try { Invoke-WebRequest http://127.0.0.1:18766/ -UseBasicParsing | Out-Null; break } catch { Start-Sleep 1 } }
+          $c = (Invoke-RestMethod http://127.0.0.1:18766/api/composants -Headers $h).composants
+          $c | Format-Table id, categorie, etat -AutoSize
+          $choco = @($c | Where-Object id -eq 'Chocolatey')[0]
+          if ($choco.etat -notmatch '^d\u00e9j\u00e0 install\u00e9$') { throw "Chocolatey : état « $($choco.etat) »" }
+          $e = Invoke-RestMethod http://127.0.0.1:18766/api/etat -Headers $h
+          if ($e.mode -ne 'poste' -or $e.hote -ne 'Windows' -or $e.usage -ne 'developpement') { throw "état inattendu : $($e | ConvertTo-Json -Compress)" }
+          Stop-Process -Id $p.Id -Force
+
+      - name: Journaux (artefact)
+        if: always()
+        shell: powershell
+        run: |
+          New-Item -ItemType Directory "$env:RUNNER_TEMP\journaux" -Force | Out-Null
+          Copy-Item logs\*.log, C:\PostInstall\*.log "$env:RUNNER_TEMP\journaux" -ErrorAction SilentlyContinue
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: journaux-windows
+          path: ${{ runner.temp }}/journaux/
+
+  destinations:
+    # Création RÉELLE depuis Windows pour chaque système de destination (clé factice V:)
+    name: Clé ${{ matrix.destination }} préparée depuis Windows
+    runs-on: windows-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        destination: [Windows, Linux, Double]
+    env:
+      GITHUB_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Clé Ventoy factice (disque virtuel exFAT « Ventoy » + VTOYEFI, lettre V:)
+        shell: powershell
+        run: |
+          $script = "$env:RUNNER_TEMP\cle.txt"
+          @(
+            "create vdisk file=`"$env:RUNNER_TEMP\cle.vhdx`" maximum=12288 type=expandable",
+            'attach vdisk', 'convert mbr',
+            'create partition primary size=12200', 'format fs=exfat label=Ventoy quick', 'assign letter=V',
+            'create partition primary', 'format fs=fat label=VTOYEFI quick'
+          ) | Set-Content -LiteralPath $script -Encoding ASCII
+          diskpart /s $script
+          if ($LASTEXITCODE -ne 0) { throw "diskpart : code $LASTEXITCODE" }
+
+      - name: Préparation réelle pour la destination ${{ matrix.destination }}
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          function Assert-Present([string[]] $Chemins) { foreach ($c in $Chemins) { if (-not (Test-Path -LiteralPath "V:\$c")) { throw "$c absent de la clé" } } }
+          function Assert-Absent([string[]] $Chemins) { foreach ($c in $Chemins) { if (Test-Path -LiteralPath "V:\$c") { throw "$c ne devrait pas être sur la clé" } } }
+          function Assert-LinuxPayload {
+            Assert-Present @('linux\installer-poste.sh', 'linux\lancer.sh', 'linux\assistant-poste.py', 'linux\alchemist.html', 'linux\kit.conf')
+            # Scripts Linux en LF malgré Windows (bash échouerait sinon)
+            foreach ($f in Get-ChildItem V:\linux -Filter *.sh) { if ([IO.File]::ReadAllText($f.FullName).Contains("`r")) { throw "$($f.Name) en CRLF" } }
+            $conf = Get-Content V:\linux\kit.conf
+            if (-not ($conf -match '^KIT_TZ=[A-Za-z_]+/[A-Za-z_]+$')) { throw "fuseau Linux invalide : $($conf -join ' | ')" }
+            $conf
+          }
+          switch ('${{ matrix.destination }}') {
+            'Windows' {
+              .\Build-Kit.ps1 -Profil windows11-bureautique -Only Chocolatey,Win7_WMF51 -Langue en -DriveLetter V
+              if ($LASTEXITCODE -ne 0) { throw "Build-Kit : code $LASTEXITCODE" }
+              Assert-Present @('postinstall\Install-Poste.ps1', 'postinstall\Assistant-Poste-Web.ps1', 'postinstall\alchemist.html', 'postinstall\catalogue.json', 'ventoy\ventoy.json', 'ventoy\script\Windows11_HorsLigne.xml')
+              Assert-Absent @('linux')
+              if (-not (Select-String V:\ventoy\ventoy.json -Pattern 'Windows11_EN_x64.iso' -Quiet)) { throw 'ventoy.json : ISO anglaise attendue' }
+              [xml]$x = Get-Content V:\ventoy\script\Windows11_HorsLigne.xml -Raw
+              if (-not (Select-String V:\ventoy\script\Windows11_HorsLigne.xml -Pattern 'en-US' -Quiet)) { throw 'fichier de réponse : en-US attendu' }
+              $cat = Get-Content V:\postinstall\catalogue.json -Raw -Encoding UTF8 | ConvertFrom-Json
+              if ($cat.Settings.TimeZone -ne 'Greenwich Standard Time') { throw "fuseau Windows : $($cat.Settings.TimeZone)" }
+              if (-not (Test-Path V:\Logiciels\Chocolatey\*.msi)) { throw 'Chocolatey non téléchargé' }
+              $bat = [IO.File]::ReadAllText('V:\postinstall\Lancer.bat')
+              if (($bat -replace "`r`n", '').Contains("`n")) { throw 'Lancer.bat converti en LF sur la clé (cmd.exe : étiquettes cassées)' }
+            }
+            'Linux' {
+              .\Build-Kit.ps1 -Systeme Linux -Usage Developpement -SkipDownload -DriveLetter V
+              if ($LASTEXITCODE -ne 0) { throw "Build-Kit : code $LASTEXITCODE" }
+              Assert-LinuxPayload
+              if (-not (Select-String V:\linux\kit.conf -Pattern '^KIT_USAGE=Developpement$' -Quiet)) { throw 'kit.conf : usage développement attendu' }
+              Assert-Absent @('postinstall')
+              # Dernières versions stables des distributions (sources officielles, rien de téléchargé)
+              .\Build-Kit.ps1 -Systeme Linux -Usage Developpement -Only Ubuntu,Ubuntu2404,LinuxMint,Debian,Fedora -DryRun -DriveLetter V
+              if ($LASTEXITCODE -ne 0) { throw "Résolution des ISO Linux : code $LASTEXITCODE" }
+            }
+            'Double' {
+              # Ubuntu déjà sur la clé (passe précédente, ISO réelle trop lourde pour un test)
+              New-Item -ItemType Directory V:\ISO\Linux\Ubuntu -Force | Out-Null
+              $iso = 'V:\ISO\Linux\Ubuntu\ubuntu-26.04-desktop-amd64.iso'
+              $fs = [IO.File]::Create($iso); $fs.SetLength(2MB); $fs.Dispose()
+              [IO.File]::WriteAllText('V:\MANIFEST.sha256', ('{0} *ISO/Linux/Ubuntu/ubuntu-26.04-desktop-amd64.iso' -f (Get-FileHash $iso -Algorithm SHA256).Hash.ToLower()) + "`n")
+              .\Build-Kit.ps1 -Profil windows11-developpement -Only Chocolatey -DriveLetter V
+              if ($LASTEXITCODE -ne 0) { throw "Build-Kit : code $LASTEXITCODE" }
+              Assert-Present @('postinstall\Install-Poste.ps1', 'postinstall\Assistant-Poste-Web.ps1', 'ventoy\ventoy.json', $iso.Substring(3))
+              Assert-LinuxPayload
+              if (-not (Select-String V:\LISEZMOI.txt -Pattern 'Windows' -Quiet)) { throw 'LISEZMOI du système principal (Windows) attendu' }
+            }
+          }
+          Get-ChildItem V:\ -Recurse -File | Where-Object FullName -notmatch '\\kit-cache\\' | Select-Object -First 30 FullName, Length | Format-Table -AutoSize
+
+      - name: ISO Windows officielle via Fido (Microsoft bloque souvent les serveurs de test)
+        if: matrix.destination != 'Linux'
+        continue-on-error: true
+        shell: powershell
+        run: |
+          .\Build-Kit.ps1 -Profil windows11-bureautique -Only Windows11,Windows10 -DryRun -DriveLetter V
+          if ($LASTEXITCODE -ne 0) { throw "code $LASTEXITCODE" }

@@ -442,7 +442,7 @@ function Invoke-KitHttpDownload {
 
     # Les tentatives ne sont comptées que lorsqu'elles n'apportent rien : une connexion instable
     # qui coupe régulièrement finit l'ISO (reprise) au lieu d'abandonner après 3 coupures.
-    $attempt = 0; $loops = 0
+    $attempt = 0; $loops = 0; $lastError = ''
     while ($true) {
         $attempt++; $loops++
         $resp = $null; $stream = $null; $fs = $null
@@ -520,6 +520,7 @@ function Invoke-KitHttpDownload {
         }
         catch {
             $msg = $_.Exception.Message
+            $lastError = $msg
             # 416 = plage demandée invalide : le .part est déjà complet ou corrompu
             if ($msg -match '416') {
                 Remove-Item -LiteralPath $part -Force -ErrorAction SilentlyContinue
@@ -542,7 +543,7 @@ function Invoke-KitHttpDownload {
             if ($resp) { $resp.Close() }
         }
     }
-    throw ("Échec du téléchargement après {0} tentatives : {1}" -f $loops, $Url)
+    throw ("Échec du téléchargement après {0} tentatives : {1} (dernière erreur : {2})" -f $loops, $Url, $lastError)
 }
 
 function Test-KitSignature {
@@ -769,6 +770,119 @@ function Get-KitWingetInfo {
     throw ("winget ne trouve pas d'installeur hors ligne pour {0} : {1}" -f $Item.WingetId, $lastOutput)
 }
 
+function Test-KitWingetUsable {
+    <#
+    .SYNOPSIS
+        Vrai si winget peut être utilisé ici (Windows avec winget). Sinon, les manifestes publics
+        du dépôt winget-pkgs servent de source (même URL éditeur, même SHA256).
+    #>
+    [CmdletBinding()]
+    [OutputType([bool])]
+    param()
+    return ((Test-KitWindows) -and [bool](Get-Command winget -ErrorAction SilentlyContinue))
+}
+
+function ConvertFrom-KitWingetInstallerYaml {
+    <#
+    .SYNOPSIS
+        Lit la section « Installers » d'un manifeste winget (YAML simple, sans module) : chaque
+        installeur hérite des valeurs générales du manifeste (InstallerType, Scope, InstallerLocale).
+    #>
+    [CmdletBinding()]
+    [OutputType([object[]])]
+    param([Parameter(Mandatory)] [string] $Yaml)
+    $keys = @('Architecture', 'InstallerType', 'Scope', 'InstallerUrl', 'InstallerSha256', 'InstallerLocale', 'NestedInstallerType')
+    $root = @{}; $list = New-Object System.Collections.Generic.List[hashtable]
+    $cur = $null; $inInstallers = $false; $itemIndent = -1
+    foreach ($line in ($Yaml -split "`r?`n")) {
+        if ($line -match '^\s*#' -or -not $line.Trim()) { continue }
+        if ($line -match '^Installers:\s*$') { $inInstallers = $true; continue }
+        if ($line -match '^([A-Za-z0-9]+):\s*(.*)$') {
+            # Clé de premier niveau : valeur générale (ou fin de la liste des installeurs)
+            if ($inInstallers -and $cur) { $list.Add($cur); $cur = $null }
+            $inInstallers = $false
+            if ($Matches[1] -in $keys) { $root[$Matches[1]] = $Matches[2].Trim().Trim("'").Trim('"') }
+            continue
+        }
+        if (-not $inInstallers) { continue }
+        if ($line -match '^(\s*)-\s+([A-Za-z0-9]+):\s*(.*)$' -and ($itemIndent -lt 0 -or $Matches[1].Length -le $itemIndent)) {
+            if ($cur) { $list.Add($cur) }
+            $itemIndent = $Matches[1].Length
+            $cur = @{}
+            if ($Matches[2] -in $keys) { $cur[$Matches[2]] = $Matches[3].Trim().Trim("'").Trim('"') }
+            continue
+        }
+        # Propriété directe de l'installeur (indentation = celle du « - » + 2) ; les sous-blocs sont ignorés
+        if ($cur -and $line -match '^(\s*)([A-Za-z0-9]+):\s*(.*)$' -and $Matches[1].Length -eq $itemIndent + 2 -and $Matches[2] -in $keys) {
+            $cur[$Matches[2]] = $Matches[3].Trim().Trim("'").Trim('"')
+        }
+    }
+    if ($cur) { $list.Add($cur) }
+    foreach ($i in $list) { foreach ($k in $root.Keys) { if (-not $i.ContainsKey($k)) { $i[$k] = $root[$k] } } }
+    return , $list.ToArray()
+}
+
+function Get-KitWingetManifestInfo {
+    <#
+    .SYNOPSIS
+        Sans winget (Linux, ou Windows sans App Installer) : dernière version stable d'un paquet dans
+        le dépôt public microsoft/winget-pkgs, et l'installeur correspondant au profil (architecture,
+        type, portée, langue). URL de l'éditeur et SHA256 du manifeste, comme winget.
+    #>
+    [CmdletBinding()]
+    [OutputType([pscustomobject])]
+    param([Parameter(Mandatory)] [hashtable] $Item)
+    $id = [string]$Item.WingetId
+    $dir = 'manifests/{0}/{1}' -f $id.Substring(0, 1).ToLowerInvariant(), ($id -replace '\.', '/')
+    $headers = @{ 'User-Agent' = $script:PlainAgent; 'Accept' = 'application/vnd.github+json' }
+    if ($env:GITHUB_TOKEN) { $headers['Authorization'] = "Bearer $($env:GITHUB_TOKEN)" }
+    $entries = $null; $last = ''
+    for ($attempt = 1; $attempt -le $script:MaxAttempts -and $null -eq $entries; $attempt++) {
+        # Liste JSON renvoyée comme UN objet tableau : aplatie par le pipeline (5.1 et 7)
+        try { $entries = @(Invoke-RestMethod -Uri "https://api.github.com/repos/microsoft/winget-pkgs/contents/$dir" -Headers $headers -UseBasicParsing -TimeoutSec 30 | ForEach-Object { $_ }) }
+        catch { $last = $_.Exception.Message; if ($last -match '403|429|rate limit') { break }; Start-Sleep -Seconds (2 * $attempt) }
+    }
+    if ($null -eq $entries) { throw "dépôt winget-pkgs injoignable pour $id ($last). Astuce : définir GITHUB_TOKEN (limite de 60 requêtes/heure sans jeton)." }
+    # Versions stables uniquement (chiffres et points), la plus élevée
+    $versions = @($entries | Where-Object { $_.type -eq 'dir' -and $_.name -match '^\d+(\.\d+)*$' } | ForEach-Object name)
+    if ($versions.Count -eq 0) { throw "aucune version stable de $id dans winget-pkgs" }
+    $version = $versions | Sort-Object { $p = @($_ -split '\.' | ForEach-Object { [long]$_ }); while ($p.Count -lt 6) { $p += 0 }; ($p | ForEach-Object { '{0:D12}' -f $_ }) -join '.' } | Select-Object -Last 1
+    $raw = "https://raw.githubusercontent.com/microsoft/winget-pkgs/master/$dir/$version"
+    $yaml = ''
+    foreach ($f in @("$id.installer.yaml", "$id.yaml")) {
+        try { $yaml = Get-KitText -Url "$raw/$f"; break } catch { Write-Verbose "$f absent" }
+    }
+    if (-not $yaml) { throw "manifeste d'installation introuvable pour $id $version" }
+    $installers = ConvertFrom-KitWingetInstallerYaml -Yaml $yaml   # déjà un tableau
+    $arch = [string](Get-KitValue $Item 'Architecture' '')
+    $type = [string](Get-KitValue $Item 'InstallerType' '')
+    $scope = [string](Get-KitValue $Item 'Scope' '')
+    $locale = [string](Get-KitValue $Item 'Locale' '')
+    $sameType = { param($a, $b) $a -eq $b -or @(@($a, $b) | Where-Object { $_ -in @('msi', 'wix') }).Count -eq 2 }
+    $ok = @($installers | Where-Object {
+            $_['InstallerUrl'] -and $_['InstallerSha256'] -and
+            ((-not $arch -and $_['Architecture'] -in @('x64', 'neutral', 'x86')) -or $_['Architecture'] -eq $arch -or ($arch -and $_['Architecture'] -eq 'neutral') -or ($arch -eq 'x64' -and $_['Architecture'] -eq 'x86')) -and
+            (-not $type -or (& $sameType ([string]$_['InstallerType']) $type)) -and
+            (-not $scope -or -not $_['Scope'] -or $_['Scope'] -eq $scope) -and
+            (-not $locale -or -not $_['InstallerLocale'] -or $_['InstallerLocale'] -eq $locale)
+        })
+    if ($ok.Count -eq 0) { throw "aucun installeur de $id $version ne correspond au profil (architecture $arch, type $type, portée $scope)" }
+    # Comme winget : architecture exacte (x86 en dernier recours), type d'installeur attendu par les
+    # options silencieuses du profil (« /qn » = MSI), installation pour la machine, puis ordre du manifeste
+    $wantMsi = ([string](Get-KitValue $Item 'SilentArgs' '')) -match '(^|\s)/q[nb]?(\s|$)'
+    $best = $ok | Sort-Object @{ Expression = { $w = $(if ($arch) { $arch } else { 'x64' }); if ($_['Architecture'] -eq $w) { 0 } elseif ($_['Architecture'] -eq 'neutral') { 1 } else { 2 } } },
+        @{ Expression = { if ((([string]$_['InstallerType']) -in @('msi', 'wix')) -eq $wantMsi) { 0 } else { 1 } } },
+        @{ Expression = { if ($_['Scope'] -eq 'user') { 1 } else { 0 } } } | Select-Object -First 1
+    $t = ([string]$best['InstallerType']).ToLowerInvariant()
+    $ext = switch ($t) { { $_ -in @('msi', 'wix') } { '.msi' } { $_ -in @('msix', 'appx') } { '.msix' } 'zip' { '.zip' } default { '.exe' } }
+    $leaf = Get-KitSafeFileName -Url $best['InstallerUrl']
+    if ([IO.Path]::GetExtension($leaf).ToLowerInvariant() -ne $ext) { $leaf = ('{0}-{1}{2}' -f $Item.Name, $version, $ext) }
+    return [pscustomobject]@{
+        Version = $version; Url = [string]$best['InstallerUrl']; Sha256 = ([string]$best['InstallerSha256']).ToLowerInvariant()
+        FileName = $leaf; InstallerType = $t; Manifest = "$raw/$id.installer.yaml"
+    }
+}
+
 # --------------------------------------------------------------------------- Windows / Office
 
 function Get-KitFido {
@@ -803,11 +917,29 @@ function Get-KitWindowsIsoUrl {
         [Parameter(Mandatory)] [string] $FidoPath
     )
     $last = ''
+    # Linux : Fido refuse les plateformes autres que Windows (choix de l'auteur, pas une limite de l'API
+    # Microsoft) et lit l'architecture par WMI. Copie adaptée (GPLv3) : version de Windows simulée et
+    # architecture x64 fournie ; le lien obtenu reste contrôlé (domaine microsoft.com obligatoire).
+    $linuxPrefix = ''
+    if (-not (Test-KitWindows)) {
+        $src = [IO.File]::ReadAllText($FidoPath)
+        if ($src -match '(?m)^\$winver = Get-Platform-Version\s*$') {
+            $FidoPath = Join-Path (Split-Path -Parent $FidoPath) 'Fido-linux.ps1'
+            [IO.File]::WriteAllText($FidoPath, ($src -replace '(?m)^\$winver = Get-Platform-Version\s*$', '$winver = 10.0'), (New-Object Text.UTF8Encoding($true)))
+            $linuxPrefix = 'function global:Get-CimInstance { param([string] $ClassName) [pscustomobject]@{ Architecture = 9 } }; '
+        }
+    }
     for ($attempt = 1; $attempt -le $script:MaxAttempts; $attempt++) {
-        $psHost = $(if (Test-KitWindows) { 'powershell.exe' } else { (Get-Process -Id $PID).Path })
-        $out = & $psHost -NoProfile -ExecutionPolicy Bypass -File $FidoPath `
-            -Win $Item.FidoWin -Rel $Item.FidoRel -Ed $Item.FidoEd -Lang $Item.FidoLang -Arch $Item.FidoArch -GetUrl 2>&1 |
-            ForEach-Object { [string]$_ }
+        if (Test-KitWindows) {
+            $out = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $FidoPath `
+                -Win $Item.FidoWin -Rel $Item.FidoRel -Ed $Item.FidoEd -Lang $Item.FidoLang -Arch $Item.FidoArch -GetUrl 2>&1 |
+                ForEach-Object { [string]$_ }
+        }
+        else {
+            $q = { param($v) "'" + ([string]$v).Replace("'", "''") + "'" }
+            $cmd = $linuxPrefix + ("& {0} -Win {1} -Rel {2} -Ed {3} -Lang {4} -Arch {5} -GetUrl" -f (& $q $FidoPath), (& $q $Item.FidoWin), (& $q $Item.FidoRel), (& $q $Item.FidoEd), (& $q $Item.FidoLang), (& $q $Item.FidoArch))
+            $out = & (Get-Process -Id $PID).Path -NoProfile -Command $cmd 2>&1 | ForEach-Object { [string]$_ }
+        }
         $url = @($out | Where-Object { $_ -match '^https://\S+\.iso' }) | Select-Object -Last 1
         if ($url) {
             $hostName = ([uri]$url).Host
@@ -898,11 +1030,14 @@ function Resolve-KitPlan {
 
     switch ($item.Type) {
         'Winget' {
-            $info = Get-KitWingetInfo -Item $item
+            if (Test-KitWingetUsable) { $info = Get-KitWingetInfo -Item $item }
+            else { $info = Get-KitWingetManifestInfo -Item $item }
             $Plan.Version = $info.Version
             $Plan.Source = $info
             try {
-                $ri = Get-KitRemoteInfo -Url $info.Url
+                # Manifeste : agent honnête (SourceForge sert alors le fichier, et non une page d'attente)
+                $agent = $(if ($info.PSObject.Properties['Manifest']) { $script:PlainAgent } else { '' })
+                $ri = Get-KitRemoteInfo -Url $info.Url -Agent $agent
                 if ($ri.Length -gt 0) { $Plan.NewBytes = $ri.Length; $Plan.SizeSource = 'winget+HEAD' }
             }
             catch { Write-KitLog -Level WARN -Message ("{0} : taille non lue ({1}), valeur de repli utilisée." -f $item.Name, $_.Exception.Message) }
@@ -1043,6 +1178,7 @@ function Save-KitWingetItem {
         [Parameter(Mandatory)] [string] $StageDir
     )
     $item = $Plan.Item
+    if ($Plan.Source.PSObject.Properties['Manifest']) { Save-KitWingetManifestItem -Plan $Plan -StageDir $StageDir; return }
     Get-ChildItem -LiteralPath $StageDir -Force | Remove-Item -Recurse -Force
     $installer = $null; $sigInfo = ''; $source = 'winget'; $sha = ''
     $wingetError = ''
@@ -1115,6 +1251,46 @@ function Save-KitWingetItem {
         Signature = $sigInfo
         Installer = $installer.Name
         Files     = @(@{ Name = $installer.Name; Sha256 = $sha; Length = $installer.Length; Url = $(if ($source -eq 'winget') { $Plan.Source.Url } else { $item.FallbackUrl }) })
+    }
+}
+
+function Save-KitWingetManifestItem {
+    <#
+    .SYNOPSIS
+        Sans winget : télécharge l'installeur à l'URL de l'éditeur indiquée par le manifeste winget,
+        SHA256 du manifeste obligatoire (signature Authenticode en plus sous Windows).
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)] [pscustomobject] $Plan,
+        [Parameter(Mandatory)] [string] $StageDir
+    )
+    $item = $Plan.Item
+    $info = $Plan.Source
+    $keep = @($info.FileName, "$($info.FileName).part", "$($info.FileName).part.src")
+    Get-ChildItem -LiteralPath $StageDir -Force | Where-Object { $_.Name -notin $keep } | Remove-Item -Recurse -Force
+    $dest = Join-Path $StageDir $info.FileName
+    $len = -1.0
+    if ($Plan.SizeSource -ne 'repli') { $len = [double]$Plan.NewBytes }
+    Invoke-KitHttpDownload -Url $info.Url -Destination $dest -ExpectedLength $len -SourceTag ("{0}|{1}" -f $info.Url, $info.Sha256) -Agent $script:PlainAgent
+    $sha = Get-KitSha256 -Path $dest
+    if ($sha -ne $info.Sha256) { Remove-Item -LiteralPath $dest -Force; throw "$($info.FileName) : SHA256 différent du manifeste winget. Fichier refusé." }
+    $sig = 'SHA256 du manifeste winget vérifié'
+    if (Test-KitWindows) { $sig += ' ; ' + (Test-KitSignature -Path $dest -Signer (Get-KitValue $item 'Signer' '')) }
+    if ((Get-KitValue $item 'Extract' $false) -and $info.FileName -like '*.zip') { Expand-KitPortable -StageDir $StageDir -ZipPath $dest }
+    Set-Content -LiteralPath (Join-Path $StageDir 'silent.txt') -Encoding UTF8 -Value @(
+        "Installation silencieuse de $($item.Name) $($info.Version)"
+        ''
+        ('Commande utilisée par le kit : "{0}" {1}' -f $info.FileName, (Get-KitValue $item 'SilentArgs' ''))
+        ('Source : {0} (manifeste winget officiel, sans winget)' -f $info.Manifest)
+    )
+    Write-KitSourceFile -StageDir $StageDir -Item $item -Data @{
+        Version   = $info.Version
+        WingetId  = $item.WingetId
+        Source    = 'manifeste winget'
+        Signature = $sig
+        Installer = $info.FileName
+        Files     = @(@{ Name = $info.FileName; Sha256 = $sha; Length = (Get-Item -LiteralPath $dest).Length; Url = $info.Url })
     }
 }
 
@@ -1366,4 +1542,4 @@ Export-ModuleMember -Function Initialize-KitNetwork, Initialize-KitWinget, Set-K
     Invoke-KitHttpDownload, Test-KitSignature, Test-KitIsoFile, Get-KitKeySource, Get-KitStageDir,
     Test-KitStageComplete, Get-KitWingetInfo, Get-KitWindowsIsoUrl, Get-KitOfficeVersion,
     Resolve-KitPlan, Save-KitPlan, Set-KitSignaturePolicy, Get-KitGitHubRelease, Expand-KitPortable,
-    Resolve-KitLinuxIso, Find-KitChecksum
+    Resolve-KitLinuxIso, Find-KitChecksum, Test-KitWingetUsable, Get-KitWingetManifestInfo, ConvertFrom-KitWingetInstallerYaml

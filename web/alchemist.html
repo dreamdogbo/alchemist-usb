@@ -1,0 +1,461 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Alchemist</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%236a3fd1'/%3E%3Ctext x='16' y='23' font-size='18' text-anchor='middle' fill='white'%3E%E2%9A%97%3C/text%3E%3C/svg%3E">
+<!--
+  Assistant Alchemist — interface unique pour Windows et Linux, pour CRÉER la clé et INSTALLER le poste.
+  Servie en local (127.0.0.1) par Assistant-Web.ps1, Assistant-Poste-Web.ps1 ou assistant-poste.py ;
+  le jeton d'accès est dans l'adresse (#jeton) et accompagne chaque appel à l'API. Aucune ressource externe.
+-->
+<style>
+:root {
+  --fond: #f4f5f8; --carte: #ffffff; --texte: #1d2330; --doux: #5d6678; --bord: #dde1e9;
+  --accent: #6a3fd1; --accent-doux: #efe9fc; --ok: #1e8a4c; --ok-doux: #e5f5ec; --alerte: #b26a00;
+  --alerte-doux: #fff3df; --erreur: #c0312b; --erreur-doux: #fde9e8; --console: #12151c; --console-texte: #d6dbe6;
+  --ombre: 0 1px 2px rgba(20, 25, 40, .06), 0 4px 16px rgba(20, 25, 40, .06);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --fond: #12141a; --carte: #1b1e27; --texte: #e6e9f0; --doux: #9aa3b5; --bord: #2c313e;
+    --accent: #a585ff; --accent-doux: #2a2342; --ok: #4cc786; --ok-doux: #173326; --alerte: #f0a63a;
+    --alerte-doux: #3a2c14; --erreur: #ff7a72; --erreur-doux: #3d1d1c; --console: #0b0d12; --console-texte: #cfd5e2;
+    --ombre: 0 1px 2px rgba(0, 0, 0, .3), 0 4px 16px rgba(0, 0, 0, .25);
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--fond); color: var(--texte); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Ubuntu, Cantarell, "Noto Sans", sans-serif; }
+header { background: var(--carte); border-bottom: 1px solid var(--bord); }
+.barre { max-width: 980px; margin: 0 auto; padding: 14px 16px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.logo { width: 34px; height: 34px; border-radius: 9px; background: var(--accent); color: #fff; display: grid; place-items: center; font-size: 19px; }
+h1 { font-size: 18px; margin: 0; }
+.sous-titre { color: var(--doux); font-size: 13px; }
+.pastille { margin-left: auto; font-size: 12px; padding: 4px 10px; border-radius: 99px; background: var(--accent-doux); color: var(--accent); white-space: nowrap; }
+main { max-width: 980px; margin: 0 auto; padding: 18px 16px 60px; }
+.etapes { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
+.etapes button { border: 1px solid var(--bord); background: var(--carte); color: var(--doux); border-radius: 99px; padding: 6px 14px; font: inherit; font-size: 13px; cursor: pointer; }
+.etapes button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.etapes button:disabled { cursor: default; opacity: .5; }
+section.carte { background: var(--carte); border: 1px solid var(--bord); border-radius: 14px; padding: 20px; box-shadow: var(--ombre); margin-bottom: 16px; }
+h2 { font-size: 17px; margin: 0 0 4px; }
+h3 { font-size: 14px; margin: 18px 0 8px; color: var(--doux); text-transform: uppercase; letter-spacing: .04em; }
+p.aide { color: var(--doux); margin: 0 0 14px; }
+.choix { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+.option { border: 2px solid var(--bord); border-radius: 12px; padding: 14px; cursor: pointer; background: var(--carte); text-align: left; font: inherit; color: inherit; }
+.option:hover { border-color: var(--accent); }
+.option.choisie { border-color: var(--accent); background: var(--accent-doux); }
+.option strong { display: block; font-size: 15px; margin-bottom: 2px; }
+.option span { color: var(--doux); font-size: 13px; }
+.option .icone { font-size: 24px; display: block; margin-bottom: 6px; }
+.groupe { border: 1px solid var(--bord); border-radius: 10px; margin-bottom: 10px; overflow: hidden; }
+.groupe > .titre { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: var(--fond); font-weight: 600; font-size: 13px; }
+.groupe > .titre .nb { color: var(--doux); font-weight: 400; margin-left: auto; }
+.ligne { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-top: 1px solid var(--bord); }
+.ligne label { display: flex; align-items: center; gap: 10px; flex: 1; cursor: pointer; min-width: 0; }
+.ligne .nom { font-weight: 500; }
+.ligne .detail { color: var(--doux); font-size: 13px; overflow-wrap: anywhere; }
+.ligne .taille { color: var(--doux); font-size: 13px; white-space: nowrap; }
+input[type=checkbox], input[type=radio] { width: 18px; height: 18px; accent-color: var(--accent); flex: none; }
+.badge { font-size: 11px; padding: 2px 8px; border-radius: 99px; white-space: nowrap; background: var(--fond); color: var(--doux); border: 1px solid var(--bord); }
+.badge.ok { background: var(--ok-doux); color: var(--ok); border-color: transparent; }
+.badge.alerte { background: var(--alerte-doux); color: var(--alerte); border-color: transparent; }
+.badge.erreur { background: var(--erreur-doux); color: var(--erreur); border-color: transparent; }
+.note { border-radius: 10px; padding: 10px 14px; margin: 12px 0; font-size: 14px; }
+.note.info { background: var(--accent-doux); }
+.note.alerte { background: var(--alerte-doux); color: var(--texte); border-left: 4px solid var(--alerte); }
+.note.erreur { background: var(--erreur-doux); border-left: 4px solid var(--erreur); }
+.note.ok { background: var(--ok-doux); border-left: 4px solid var(--ok); }
+.actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px; flex-wrap: wrap; }
+button.btn { font: inherit; font-weight: 600; border-radius: 10px; padding: 9px 18px; cursor: pointer; border: 1px solid var(--bord); background: var(--carte); color: var(--texte); }
+button.btn.principal { background: var(--accent); border-color: var(--accent); color: #fff; }
+button.btn.danger { background: var(--erreur); border-color: var(--erreur); color: #fff; }
+button.btn:disabled { opacity: .45; cursor: not-allowed; }
+button.lien { border: 0; background: none; color: var(--accent); font: inherit; font-size: 13px; cursor: pointer; padding: 0; }
+.champ { display: flex; flex-direction: column; gap: 4px; margin: 10px 0; }
+.champ label { font-size: 13px; color: var(--doux); }
+input[type=text], select { font: inherit; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--bord); background: var(--carte); color: var(--texte); max-width: 100%; }
+.total { color: var(--doux); font-size: 14px; }
+.console { background: var(--console); color: var(--console-texte); border-radius: 10px; padding: 12px; height: 380px; overflow: auto; font: 12.5px/1.45 ui-monospace, "Cascadia Mono", "DejaVu Sans Mono", Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+.console .e { color: #ff8f88; } .console .w { color: #f3c06b; } .console .o { color: #6fdc9b; } .console .s { color: #c7b3ff; font-weight: 700; }
+.statut { display: flex; align-items: center; gap: 10px; margin: 12px 0; font-weight: 600; }
+.roue { width: 18px; height: 18px; border-radius: 50%; border: 3px solid var(--accent-doux); border-top-color: var(--accent); animation: tour 1s linear infinite; }
+@keyframes tour { to { transform: rotate(360deg); } }
+.cache { display: none !important; }
+.resume { display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px; font-size: 14px; }
+.resume dt { color: var(--doux); } .resume dd { margin: 0; overflow-wrap: anywhere; }
+@media (max-width: 560px) { .ligne { flex-wrap: wrap; } .pastille { margin-left: 0; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="barre">
+    <div class="logo" aria-hidden="true">⚗</div>
+    <div><h1 id="titre">Alchemist</h1><div class="sous-titre" id="sous-titre">Chargement…</div></div>
+    <div class="pastille" id="pastille"></div>
+  </div>
+</header>
+<main>
+  <nav class="etapes" id="etapes" aria-label="Étapes"></nav>
+  <div id="contenu"></div>
+</main>
+
+<script>
+'use strict';
+// ------------------------------------------------------------------ accès à l'API locale
+const JETON = (location.hash || '').replace(/^#/, '');
+async function api(chemin, donnees) {
+  const options = { method: donnees === undefined ? 'GET' : 'POST', headers: { 'X-Alchemist-Jeton': JETON } };
+  if (donnees !== undefined) { options.body = JSON.stringify(donnees); options.headers['Content-Type'] = 'application/json'; }
+  const r = await fetch(chemin, options);
+  const texte = await r.text();
+  let corps = {};
+  try { corps = texte ? JSON.parse(texte) : {}; } catch (e) { corps = { erreur: texte }; }
+  if (!r.ok) throw new Error(corps.erreur || ('Erreur ' + r.status));
+  return corps;
+}
+const $ = (sel, racine) => (racine || document).querySelector(sel);
+function el(balise, attributs, ...enfants) {
+  const n = document.createElement(balise);
+  for (const [k, v] of Object.entries(attributs || {})) {
+    if (v === undefined || v === null || v === false) continue;
+    if (k === 'classe') n.className = v;
+    else if (k.startsWith('on')) n.addEventListener(k.slice(2), v);
+    else if (k === 'checked' || k === 'disabled' || k === 'value') n[k] = v;
+    else n.setAttribute(k, v === true ? '' : v);
+  }
+  for (const e of enfants.flat()) if (e !== null && e !== undefined && e !== false) n.append(e.nodeType ? e : document.createTextNode(String(e)));
+  return n;
+}
+// Ajoute des enfants à un nœud existant en ignorant les valeurs vides (append() écrirait « null »)
+function ajouter(n, ...enfants) { for (const e of enfants.flat()) if (e !== null && e !== undefined && e !== false) n.append(e); return n; }
+function taille(mo) { return mo >= 1024 ? (mo / 1024).toFixed(1).replace('.', ',') + ' Go' : Math.round(mo) + ' Mo'; }
+function grouper(liste, cle) { const g = new Map(); for (const x of liste) { const k = x[cle] || 'Autres'; if (!g.has(k)) g.set(k, []); g.get(k).push(x); } return g; }
+
+// ------------------------------------------------------------------ état commun
+const E = { etat: null, etape: 0, etapes: [], travail: null, suivant: 0, minuteur: null };
+function etapes(noms) { E.etapes = noms; }
+function aller(i) { E.etape = i; dessiner(); window.scrollTo(0, 0); }
+function dessiner() {
+  const nav = $('#etapes'); nav.replaceChildren();
+  E.etapes.forEach((nom, i) => nav.append(el('button', {
+    classe: i === E.etape ? 'active' : '', disabled: (E.travail && E.travail.actif) || i > E.max(), onclick: () => aller(i)
+  }, (i + 1) + '. ' + nom)));
+  const c = $('#contenu'); c.replaceChildren(E.vues[E.etape]());
+}
+setInterval(() => { api('/api/ping').catch(() => {}); }, 20000);
+
+// ------------------------------------------------------------------ journal (commun aux deux modes)
+function vueTravail(titre, retour) {
+  const box = el('div', { classe: 'console', id: 'console', role: 'log', 'aria-live': 'polite' });
+  const statut = el('div', { classe: 'statut', id: 'statut' }, el('div', { classe: 'roue' }), 'Démarrage…');
+  const bilan = el('div', { id: 'bilan' });
+  const arreter = el('button', { classe: 'btn', id: 'arreter', onclick: async () => {
+    if (!confirm('Arrêter la tâche en cours ? Ce qui est terminé est conservé ; relancer reprend là où c\'était.')) return;
+    try { await api('/api/arreter', {}); } catch (e) { alert(e.message); }
+  } }, 'Arrêter');
+  const fin = el('div', { classe: 'actions cache', id: 'fin' },
+    el('button', { classe: 'btn', onclick: () => api('/api/ouvrir', { cible: 'journaux' }).catch(e => alert(e.message)) }, 'Ouvrir les journaux'),
+    el('button', { classe: 'btn principal', onclick: () => { E.travail = null; retour(); } }, 'Recommencer'));
+  setTimeout(suivreJournal, 50);
+  return el('section', { classe: 'carte' }, el('h2', {}, titre), statut, box, bilan,
+    el('div', { classe: 'actions', id: 'en-cours' }, arreter), fin);
+}
+function classeLigne(l) {
+  if (/à installer en ligne sur le poste/.test(l)) return '';
+  if (/Bilan :/.test(l)) return /\b[1-9]\d* ÉCHEC/.test(l) ? 'e' : 'o';
+  if (/\[(ERROR|ERREUR)\s*\]|(?<!\b0 )ÉCHEC/.test(l)) return 'e';
+  if (/\[WARN\s*\]|IGNORÉ|\(paquet indisponible/.test(l)) return 'w';
+  if (/\[OK\s*\]|^\s*OK\b|Terminé sans échec|DÉJÀ INSTALLÉ/.test(l)) return 'o';
+  if (/\[(STEP|ETAPE)\s*\]|^== /.test(l)) return 's';
+  return '';
+}
+async function suivreJournal() {
+  clearTimeout(E.minuteur);
+  let j;
+  try { j = await api('/api/journal?depuis=' + E.suivant); }
+  catch (e) { E.minuteur = setTimeout(suivreJournal, 2000); return; }
+  const box = $('#console'); if (!box) return;
+  const enBas = box.scrollTop + box.clientHeight >= box.scrollHeight - 30;
+  for (const brut of j.lignes) {
+    const l = brut.replace(/\x1b\[[0-9;]*m/g, '');
+    box.append(el('div', { classe: classeLigne(l) }, l || ' '));
+    const s = l.replace(/^\S+ \S+ \[[^\]]+\]\s*/, '').trim();
+    if (s && j.actif) $('#statut').replaceChildren(el('div', { classe: 'roue' }), s.length > 110 ? s.slice(0, 110) + '…' : s);
+  }
+  if (enBas) box.scrollTop = box.scrollHeight;
+  E.suivant = j.suivant;
+  E.travail = j;
+  if (j.actif) { E.minuteur = setTimeout(suivreJournal, 800); return; }
+  // Terminé
+  $('#en-cours').classList.add('cache'); $('#fin').classList.remove('cache');
+  const r = E.interpreter(j.code);
+  $('#statut').replaceChildren(r.texte);
+  $('#bilan').replaceChildren(el('div', { classe: 'note ' + r.classe }, r.detail));
+  dessiner.verrou = false;
+  document.title = (r.classe === 'ok' ? '✔ ' : '✖ ') + 'Alchemist';
+  $('#etapes').querySelectorAll('button').forEach(b => b.disabled = false);
+}
+async function lancer(chemin, donnees, titre, retour) {
+  try {
+    await api(chemin, donnees);
+  } catch (e) { alert('Impossible de lancer : ' + e.message); return; }
+  E.suivant = 0; E.travail = { actif: true };
+  E.vues[E.etapes.length - 1] = () => vueTravail(titre, retour);
+  aller(E.etapes.length - 1);
+}
+
+// ================================================================== MODE CRÉATION DE LA CLÉ
+const C = { profils: [], systeme: '', usage: '', profil: null, langue: '', choix: new Set(), cles: null, cle: '', mode: 'existante', disque: '', confirmation: '', simulation: false, isoUrl: '' };
+
+// « Windows + Linux » : profil Windows de l'usage choisi, avec Ubuntu en plus (les deux post-installations vont sur la clé)
+function profilCourant() { const s = C.systeme === 'Double' ? 'Windows' : C.systeme; return C.profils.find(p => p.Systeme === s && p.Usage === C.usage) || null; }
+function choisirProfil() {
+  C.profil = profilCourant();
+  if (!C.profil) return;
+  C.choix = new Set(C.profil.Items.filter(i => i.Default).map(i => i.Name));
+  if (C.systeme === 'Double') C.profil.Items.filter(i => i.Type === 'LinuxIso' && i.Name === 'Ubuntu').forEach(i => C.choix.add(i.Name));
+  C.langue = C.profil.LangueDefaut || (C.profil.Langues[0] || '');
+}
+
+function vueSysteme() {
+  const carte = (val, icone, titre, texte, cle) => el('button', {
+    classe: 'option' + (C[cle] === val ? ' choisie' : ''), onclick: () => { C[cle] = val; choisirProfil(); dessiner(); }
+  }, el('span', { classe: 'icone' }, icone), el('strong', {}, titre), el('span', {}, texte));
+  const d = u => { const sy = (C.systeme === 'Double' || !C.systeme) ? 'Windows' : C.systeme; const p = C.profils.find(x => x.Systeme === sy && x.Usage === u); return p ? p.Description : ''; };
+  return el('section', { classe: 'carte' },
+    el('h2', {}, 'Quel système installer avec cette clé ?'),
+    el('p', { classe: 'aide' }, 'La clé Ventoy démarre l\'installation, puis la post-installation met le poste en ordre de marche.'),
+    el('div', { classe: 'choix' },
+      carte('Windows', '🪟', 'Windows 11 (ou 10)', 'ISO officielle Microsoft, installation automatique, logiciels et réglages', 'systeme'),
+      carte('Linux', '🐧', 'Linux', 'Ubuntu LTS, Linux Mint, Debian ou Fedora, stack depuis les dépôts officiels', 'systeme'),
+      carte('Double', '🔀', 'Windows + Linux', 'Une seule clé pour les deux : Windows 11 et Ubuntu (ou Mint, Debian, Fedora), chacun avec sa post-installation', 'systeme')),
+    el('h3', {}, 'Usage du poste'),
+    el('div', { classe: 'choix' },
+      carte('Bureautique', '📄', 'Bureautique', d('Bureautique'), 'usage'),
+      carte('Developpement', '👩‍💻', 'Développement', d('Developpement'), 'usage')),
+    el('div', { classe: 'actions' }, el('button', { classe: 'btn principal', disabled: !C.profil, onclick: () => aller(1) }, 'Suivant')));
+}
+
+function vueContenu() {
+  const p = C.profil;
+  const groupes = grouper(p.Items, 'Category');
+  const totalMo = () => p.Items.filter(i => C.choix.has(i.Name) && !i.SurLePoste).reduce((s, i) => s + (i.SizeMB || 0), 0);
+  const total = el('div', { classe: 'total' });
+  const majTotal = () => total.textContent = C.choix.size + ' élément(s) — environ ' + taille(totalMo()) + ' sur la clé';
+  const liste = el('div');
+  for (const [cat, items] of groupes) {
+    const g = el('div', { classe: 'groupe' }, el('div', { classe: 'titre' }, cat, el('span', { classe: 'nb' }, items.length + '')));
+    for (const it of items) {
+      const badges = [];
+      if (it.SurLePoste) badges.push(el('span', { classe: 'badge alerte', title: 'Depuis Linux, cet élément (Office, ou fichier sans empreinte publiée) est installé en ligne par la post-installation.' }, 'installé en ligne sur le poste'));
+      if (it.Compat && it.Compat.length && !it.Compat.includes('11')) badges.push(el('span', { classe: 'badge' }, 'Windows ' + it.Compat.join('/')));
+      if (it.Mode === 'Manuel') badges.push(el('span', { classe: 'badge' }, 'outil à la demande'));
+      g.append(el('div', { classe: 'ligne' }, el('label', {},
+        el('input', { type: 'checkbox', checked: C.choix.has(it.Name), onchange: e => { e.target.checked ? C.choix.add(it.Name) : C.choix.delete(it.Name); majTotal(); } }),
+        el('span', { classe: 'nom' }, it.Name), ...badges), el('span', { classe: 'taille' }, it.SurLePoste ? '—' : taille(it.SizeMB || 0))));
+    }
+    liste.append(g);
+  }
+  majTotal();
+  const notes = [];
+  if (E.etat.hote === 'Linux' && p.Systeme === 'Windows') notes.push(el('div', { classe: 'note alerte' },
+    'Clé Windows préparée depuis Linux : l\'ISO et les logiciels vont sur la clé (manifestes officiels de winget, SHA256 vérifiés). Seuls Office et les rares fichiers sans empreinte publiée sont installés en ligne par la post-installation.'));
+  const langue = p.Langues.length ? el('div', { classe: 'champ' }, el('label', { for: 'langue' }, 'Langue de Windows, d\'Office et du clavier'),
+    el('select', { id: 'langue', onchange: e => C.langue = e.target.value }, p.Langues.map(l => el('option', { value: l.Code, selected: l.Code === C.langue ? true : null }, l.Label)))) : null;
+  return el('section', { classe: 'carte' },
+    el('h2', {}, C.systeme === 'Double' ? (p.Nom + ' + Linux') : p.Nom),
+    C.systeme === 'Double' ? el('div', { classe: 'note info' }, 'Clé double système : cochez Windows et au moins une distribution Linux (catégorie « Systèmes supplémentaires »). Au démarrage, Ventoy propose les deux ; chaque poste trouve sa post-installation sur la clé (dossier postinstall pour Windows, linux pour Linux).') : null,
+    el('p', { classe: 'aide' }, 'Cochez ce qui doit être sur la clé. Les éléments les plus importants passent en premier si la place manque.'),
+    ...notes, langue, liste, total,
+    el('div', { classe: 'actions' },
+      el('button', { classe: 'btn', onclick: () => aller(0) }, 'Précédent'),
+      el('button', { classe: 'btn principal', onclick: () => { if (!C.choix.size) { alert('Cochez au moins un élément.'); return; } aller(2); } }, 'Suivant')));
+}
+
+async function chargerCles(zone) {
+  zone.replaceChildren(el('div', { classe: 'statut' }, el('div', { classe: 'roue' }), 'Recherche des clés…'));
+  try { C.cles = await api('/api/cles'); }
+  catch (e) { zone.replaceChildren(el('div', { classe: 'note erreur' }, e.message)); return; }
+  if (!C.cle && C.cles.ventoy.length) C.cle = C.cles.ventoy[0].Root;
+  if (!C.cles.ventoy.length && C.mode === 'existante' && C.cles.disques.length) C.mode = 'neuve';
+  zone.replaceChildren(listeCles());
+}
+function listeCles() {
+  const k = C.cles;
+  const radio = (nom, val, cle, onc) => el('input', { type: 'radio', name: nom, checked: C[cle] === val, onchange: () => { C[cle] = val; if (onc) onc(); } });
+  const blocExistante = el('div', { classe: 'groupe' }, el('div', { classe: 'titre' }, radio('mode', 'existante', 'mode', () => $('#zone-cles').replaceChildren(listeCles())), 'Clé Ventoy déjà prête (rien n\'est effacé)'));
+  if (!k.ventoy.length) blocExistante.append(el('div', { classe: 'ligne' }, el('span', { classe: 'detail' }, 'Aucune clé Ventoy détectée. Branchez-la (et ouvrez-la dans le gestionnaire de fichiers sous Linux), puis « Actualiser ».')));
+  for (const v of k.ventoy) blocExistante.append(el('div', { classe: 'ligne' }, el('label', {},
+    radio('cle', v.Root, 'cle'), el('span', { classe: 'nom' }, v.Root), el('span', { classe: 'detail' }, (v.Label || '') + ' · ' + v.FileSystem + ' · ' + v.FreeGB + ' Go libres sur ' + v.TotalGB + ' Go')),
+    v.FileSystem && /fat32|vfat/i.test(v.FileSystem) ? el('span', { classe: 'badge alerte', title: 'Fichiers de 4 Go maximum : l\'ISO Windows ne rentre pas' }, 'FAT32') : null));
+  const blocNeuve = el('div', { classe: 'groupe' }, el('div', { classe: 'titre' }, radio('mode', 'neuve', 'mode', () => $('#zone-cles').replaceChildren(listeCles())), 'Clé neuve ou à réinitialiser : installer Ventoy (EFFACE la clé)'));
+  if (C.mode === 'neuve') {
+    if (!k.disques.length) blocNeuve.append(el('div', { classe: 'ligne' }, el('span', { classe: 'detail' }, 'Aucune clé USB ou carte SD détectée (les disques internes ne sont jamais proposés).')));
+    for (const d of k.disques) blocNeuve.append(el('div', { classe: 'ligne' }, el('label', {},
+      radio('disque', d.Id, 'disque'), el('span', { classe: 'nom' }, d.Id), el('span', { classe: 'detail' }, (d.Model || 'Disque USB') + ' · ' + d.SizeGB + ' Go' + (d.Letters.length ? ' · ' + d.Letters.join(', ') : ''))),
+      d.IsVentoy ? el('span', { classe: 'badge' }, 'déjà Ventoy') : null));
+    if (k.disques.length) blocNeuve.append(el('div', { classe: 'ligne' }, el('div', { classe: 'champ', style: 'flex:1' },
+      el('label', { for: 'confirm' }, 'Toutes les données de la clé choisie seront DÉFINITIVEMENT effacées. Tapez EFFACER pour confirmer :'),
+      el('input', { type: 'text', id: 'confirm', value: C.confirmation, autocomplete: 'off', oninput: e => C.confirmation = e.target.value.trim() }))));
+    if (!k.admin) blocNeuve.append(el('div', { classe: 'ligne' }, el('span', { classe: 'detail' }, '🔒 Les droits administrateur seront demandés au lancement.')));
+  }
+  return el('div', {}, blocExistante, blocNeuve);
+}
+function vueCle() {
+  const zone = el('div', { id: 'zone-cles' });
+  if (C.cles) zone.append(listeCles()); else setTimeout(() => chargerCles(zone), 0);
+  const avance = el('details', {}, el('summary', {}, 'Options avancées'),
+    el('div', { classe: 'champ' }, el('label', {}, el('input', { type: 'checkbox', checked: C.simulation, onchange: e => C.simulation = e.target.checked }), ' Simulation : vérifier les sources et la place, sans rien écrire')),
+    C.profil.Items.some(i => i.Type === 'WindowsIso') ? el('div', { classe: 'champ' }, el('label', { for: 'iso' }, 'Lien de l\'ISO Windows (si Microsoft bloque le téléchargement automatique, erreur 715-123130)'),
+      el('input', { type: 'text', id: 'iso', placeholder: 'https://software.download.prss.microsoft.com/…', value: C.isoUrl, oninput: e => C.isoUrl = e.target.value.trim() })) : null);
+  return el('section', { classe: 'carte' },
+    el('h2', {}, 'Quelle clé préparer ?'),
+    el('p', { classe: 'aide' }, 'Une clé déjà préparée est mise à jour : seules les nouvelles versions sont téléchargées, vos fichiers personnels ne sont jamais touchés.'),
+    zone, el('button', { classe: 'lien', onclick: () => chargerCles($('#zone-cles')) }, '↻ Actualiser'), el('div', { style: 'margin-top:12px' }, avance),
+    el('div', { classe: 'actions' },
+      el('button', { classe: 'btn', onclick: () => aller(1) }, 'Précédent'),
+      el('button', { classe: 'btn principal', onclick: () => {
+        if (C.mode === 'existante' && !C.cle) { alert('Choisissez une clé Ventoy, ou « Clé neuve ».'); return; }
+        if (C.mode === 'neuve' && !C.disque) { alert('Choisissez la clé à effacer.'); return; }
+        if (C.mode === 'neuve' && C.confirmation !== 'EFFACER') { alert('Tapez EFFACER (en majuscules) pour confirmer l\'effacement.'); return; }
+        aller(3);
+      } }, 'Suivant')));
+}
+function vueResume() {
+  const p = C.profil;
+  const cle = C.mode === 'existante' ? C.cle : (C.disque + ' — sera EFFACÉE et reçoit Ventoy');
+  const lang = p.Langues.find(l => l.Code === C.langue);
+  return el('section', { classe: 'carte' },
+    el('h2', {}, 'Prêt à préparer la clé'),
+    el('dl', { classe: 'resume' },
+      el('dt', {}, 'Système'), el('dd', {}, C.systeme === 'Double' ? p.Nom + ' + Linux (double système)' : p.Nom),
+      lang ? el('dt', {}, 'Langue') : null, lang ? el('dd', {}, lang.Label) : null,
+      el('dt', {}, 'Éléments'), el('dd', {}, [...C.choix].join(', ')),
+      el('dt', {}, 'Clé'), el('dd', {}, cle),
+      el('dt', {}, 'Mode'), el('dd', {}, C.simulation ? 'Simulation (rien n\'est écrit)' : 'Préparation réelle')),
+    C.mode === 'neuve' ? el('div', { classe: 'note erreur' }, '⚠ La clé ' + C.disque + ' va être entièrement effacée.') : null,
+    el('div', { classe: 'note info' }, 'Plusieurs Go peuvent être téléchargés : laissez l\'ordinateur allumé (la mise en veille est suspendue sous Windows). Une coupure n\'est pas grave : relancer reprend le téléchargement.'),
+    el('div', { classe: 'actions' },
+      el('button', { classe: 'btn', onclick: () => aller(2) }, 'Précédent'),
+      el('button', { classe: 'btn ' + (C.mode === 'neuve' ? 'danger' : 'principal'), onclick: () => lancer('/api/lancer', {
+        profil: p.Profil, elements: [...C.choix], langue: C.langue, simulation: C.simulation, isoUrl: C.isoUrl,
+        cle: C.mode === 'existante' ? { mode: 'existante', racine: C.cle } : { mode: 'neuve', disque: C.disque, confirmation: C.confirmation }
+      }, 'Préparation de la clé', () => { C.cles = null; C.confirmation = ''; aller(2); }) }, C.simulation ? 'Lancer la simulation' : 'Préparer la clé')));
+}
+function interpreterCreation(code) {
+  if (code === 0) return { classe: 'ok', texte: C.simulation ? '✔ Simulation réussie' : '✔ Clé prête', detail: C.simulation ? 'Simulation terminée : tout est disponible. Relancez sans « Simulation » pour préparer la clé.' : 'Tout est en place. Éjectez la clé proprement (« Retirer en toute sécurité ») avant de la débrancher. Démarrez le poste sur la clé (menu de démarrage : F12, F8, Échap ou F11 selon le fabricant).' };
+  if (code === 1) return { classe: 'alerte', texte: '⚠ Terminé avec des échecs', detail: 'Certains éléments sont en échec (voir le journal) ; le reste est en place. Relancez : seuls les éléments manquants sont repris.' };
+  if (code === 3) return { classe: 'erreur', texte: '✖ Source officielle introuvable', detail: 'Le système ou Office n\'a pas pu être obtenu (rien n\'a été écrit). Vérifiez Internet ; pour Windows, collez le lien de l\'ISO dans les options avancées.' };
+  if (code === null || code === undefined) return { classe: 'alerte', texte: '⚠ Interrompu', detail: 'La tâche a été arrêtée. Relancez pour reprendre.' };
+  return { classe: 'erreur', texte: '✖ Préparation impossible', detail: 'Voir le message en rouge dans le journal (clé absente, protégée, autorisation refusée…).' };
+}
+
+// ================================================================== MODE INSTALLATION DU POSTE
+const P = { composants: [], choix: new Set(), usage: '', options: {} };
+function defautsPoste() { P.choix = new Set(P.composants.filter(c => P.usage === 'developpement' ? c.defautDev : c.defautBur).map(c => c.id)); }
+function vuePoste() {
+  const s = el('section', { classe: 'carte' });
+  const e = E.etat;
+  const liste = el('div');
+  const total = el('div', { classe: 'total' });
+  const maj = () => total.textContent = P.choix.size + ' élément(s) choisi(s)';
+  const dessinerListe = () => {
+    liste.replaceChildren();
+    for (const [cat, items] of grouper(P.composants, 'categorie')) {
+      const g = el('div', { classe: 'groupe' }, el('div', { classe: 'titre' }, cat, el('span', { classe: 'nb' }, items.length + '')));
+      for (const c of items) {
+        const b = c.etat ? el('span', { classe: 'badge ' + (c.classe || '') }, c.etat) : null;
+        const lancerOutil = c.outil ? el('button', { classe: 'lien', onclick: () => api('/api/outil', { id: c.id }).catch(x => alert(x.message)) }, 'Lancer') : null;
+        g.append(el('div', { classe: 'ligne' }, el('label', {},
+          el('input', { type: 'checkbox', checked: P.choix.has(c.id), disabled: !!c.outil, onchange: ev => { ev.target.checked ? P.choix.add(c.id) : P.choix.delete(c.id); maj(); } }),
+          el('span', {}, el('span', { classe: 'nom' }, c.nom), c.description ? el('div', { classe: 'detail' }, c.description) : null)), b, lancerOutil));
+      }
+      liste.append(g);
+    }
+    maj();
+  };
+  dessinerListe();
+  const carte = (val, icone, titre, texte) => el('button', { classe: 'option' + (P.usage === val ? ' choisie' : ''), onclick: () => { P.usage = val; defautsPoste(); dessiner(); } },
+    el('span', { classe: 'icone' }, icone), el('strong', {}, titre), el('span', {}, texte));
+  const opts = [];
+  if (e.options && e.options.includes('reglages')) opts.push(el('div', { classe: 'champ' }, el('label', {}, el('input', { type: 'checkbox', checked: P.options.reglages !== false, onchange: ev => P.options.reglages = ev.target.checked }), ' Réglages recommandés (activation de Windows avec la licence du PC s\'il en a une, extensions visibles, mise en veille, fuseau, PDF par défaut, mises à jour)')));
+  if (e.options && e.options.includes('sansOffice')) opts.push(el('div', { classe: 'champ' }, el('label', {}, el('input', { type: 'checkbox', checked: !!P.options.sansOffice, onchange: ev => P.options.sansOffice = ev.target.checked }), ' Ne pas installer Office')));
+  if (e.options && e.options.includes('nomPoste')) opts.push(el('div', { classe: 'champ' }, el('label', { for: 'nom' }, 'Nom du poste (facultatif, 15 caractères : lettres, chiffres, tiret)'),
+    el('input', { type: 'text', id: 'nom', maxlength: '15', value: P.options.nomPoste || '', oninput: ev => P.options.nomPoste = ev.target.value.trim() })));
+  ajouter(s,
+    el('h2', {}, 'Installer ce poste'),
+    el('p', { classe: 'aide' }, e.distribution ? ('Système : ' + e.distribution + '. ') : '', 'Ce qui est déjà installé est sauté ; relancer reprend là où c\'était.'),
+    e.internet === false ? el('div', { classe: 'note alerte' }, 'Pas d\'Internet : seuls les logiciels présents sur la clé peuvent être installés.') : null,
+    e.usages ? el('div', { classe: 'choix' }, carte('bureautique', '📄', 'Bureautique', 'Navigateurs, bureautique, PDF, sécurité'), carte('developpement', '👩‍💻', 'Développement', 'Bureautique + VS Code, Git, conteneurs, langages')) : null,
+    el('h3', {}, 'Logiciels et composants'),
+    el('div', {}, el('button', { classe: 'lien', onclick: () => { P.composants.filter(c => !c.outil).forEach(c => P.choix.add(c.id)); dessinerListe(); } }, 'Tout cocher'), ' · ',
+      el('button', { classe: 'lien', onclick: () => { P.choix.clear(); dessinerListe(); } }, 'Tout décocher'), ' · ',
+      el('button', { classe: 'lien', onclick: () => { defautsPoste(); dessinerListe(); } }, 'Sélection recommandée')),
+    el('div', { style: 'margin-top:10px' }, liste), total,
+    opts.length ? el('h3', {}, 'Options') : null, ...opts,
+    el('div', { classe: 'actions' }, el('button', { classe: 'btn principal', onclick: () => {
+      if (!P.choix.size && P.options.reglages === false) { alert('Rien à faire : cochez au moins un élément.'); return; }
+      if (P.options.nomPoste && !/^(?![0-9]+$)[A-Za-z0-9-]{1,15}$/.test(P.options.nomPoste)) { alert('Nom de poste invalide (15 caractères max : lettres, chiffres, tiret ; pas uniquement des chiffres).'); return; }
+      if (!confirm('Installer ' + P.choix.size + ' élément(s) sur ce poste ?' + (e.hote === 'Linux' ? '\nLe mot de passe administrateur sera demandé.' : ''))) return;
+      lancer('/api/lancer', { elements: [...P.choix], usage: P.usage, options: P.options }, 'Installation du poste', () => { chargerPoste().then(() => aller(0)); });
+    } }, 'Installer')));
+  return s;
+}
+async function chargerPoste() {
+  const r = await api('/api/composants');
+  P.composants = r.composants;
+  if (!P.usage) P.usage = r.usage || 'bureautique';
+  defautsPoste();
+}
+function interpreterPoste(code) {
+  if (code === 0) return { classe: 'ok', texte: '✔ Poste prêt', detail: 'Installation terminée sans échec. Redémarrez le poste pour appliquer tous les réglages (groupes, chemins, nom du poste).' };
+  if (code === 126 || code === 127) return { classe: 'erreur', texte: '✖ Autorisation refusée', detail: 'Les droits administrateur sont nécessaires : relancez et saisissez le mot de passe.' };
+  if (code === null || code === undefined) return { classe: 'alerte', texte: '⚠ Interrompu', detail: 'Relancez : ce qui est déjà fait est sauté.' };
+  return { classe: 'alerte', texte: '⚠ Terminé avec ' + code + ' échec(s)', detail: 'Voir les lignes en rouge du journal. Relancez : ce qui est fait est sauté.' };
+}
+
+// ================================================================== démarrage
+async function demarrer() {
+  try { E.etat = await api('/api/etat'); }
+  catch (e) {
+    $('#sous-titre').textContent = '';
+    $('#contenu').replaceChildren(el('section', { classe: 'carte' }, el('div', { classe: 'note erreur' },
+      JETON ? ('Assistant injoignable : ' + e.message + '. Relancez-le.') : 'Adresse incomplète : ouvrez l\'assistant avec son lanceur (Creer-Cle, Lancer.bat ou lancer.sh).')));
+    return;
+  }
+  const e = E.etat;
+  $('#pastille').textContent = (e.hote === 'Windows' ? '🪟 ' : '🐧 ') + e.hote + (e.version ? ' · v' + e.version : '');
+  if (e.mode === 'creer') {
+    $('#titre').textContent = 'Alchemist — préparer une clé';
+    $('#sous-titre').textContent = 'Système → contenu → clé → préparation';
+    document.title = 'Alchemist — clé';
+    C.profils = (await api('/api/profils')).profils;
+    etapes(['Système', 'Contenu', 'Clé', 'Préparation']);
+    E.vues = [vueSysteme, vueContenu, vueCle, vueResume];
+    E.max = () => !C.profil ? 0 : 3;
+    E.interpreter = interpreterCreation;
+  } else {
+    $('#titre').textContent = 'Alchemist — installer le poste';
+    $('#sous-titre').textContent = 'Logiciels → installation';
+    document.title = 'Alchemist — poste';
+    await chargerPoste();
+    etapes(['Logiciels', 'Installation']);
+    E.vues = [vuePoste, () => el('section', { classe: 'carte' }, el('p', {}, 'Aucune installation en cours.'))];
+    E.max = () => 1;
+    E.interpreter = interpreterPoste;
+  }
+  if (e.travail && e.travail.actif) {     // page rechargée pendant une tâche : on la reprend
+    E.suivant = 0; E.travail = e.travail;
+    const titre = e.mode === 'creer' ? 'Préparation de la clé' : 'Installation du poste';
+    E.vues[E.etapes.length - 1] = () => vueTravail(titre, () => aller(0));
+    E.etape = E.etapes.length - 1;
+  }
+  dessiner();
+}
+demarrer();
+</script>
+</body>
+</html>

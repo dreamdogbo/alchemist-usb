@@ -13,10 +13,17 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: shellcheck
-        run: shellcheck -S warning payload/linux/linux/*.sh creer-cle.sh tests/linux/*.sh
+        run: shellcheck -S warning payload/linux/linux/*.sh creer-cle.sh tests/linux/*.sh tests/moteur/*.sh
 
       - name: Liste des composants
         run: bash payload/linux/linux/installer-poste.sh --liste
+
+      - name: Tests du moteur (PowerShell 7 sous Linux)
+        shell: pwsh
+        run: ./tests/moteur/Test-Moteur.ps1
+
+      - name: Assistant de post-installation Linux (syntaxe Python)
+        run: python3 -c "import ast,sys; ast.parse(open(sys.argv[1], encoding=\"utf-8\").read())" payload/linux/linux/assistant-poste.py
 
       - name: Moteur PowerShell 7 sous Linux (profils, éléments)
         shell: pwsh
@@ -39,6 +46,16 @@ jobs:
             $r = Resolve-KitLinuxIso -Item @{ Distro = $d }
             "{0,-30} {1}" -f $r.Label, $r.FileName
           }
+
+  cle-factice:
+    # Clé Ventoy factice (image disque) : clés Linux, Windows et double système préparées depuis Linux,
+    # garde-fous, assistants universels (création et poste) et installation réelle par l'assistant
+    name: Clé factice et assistants universels
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Préparation réelle d'une clé factice depuis Linux
+        run: bash tests/moteur/test-cle-factice.sh
 
   simulation:
     name: Simulation ${{ matrix.image }}
