@@ -51,7 +51,7 @@ $psExe = $(if ($win) { Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\po
 function Test-SurLePoste {
     param($Item)
     if ($win) { return $false }
-    if ($Item.Type -in @('Winget', 'Office')) { return $true }
+    if ($Item.Type -eq 'Office') { return $true }
     if ($Item.Type -eq 'Url') { return (@($Item.Files | Where-Object { -not (Get-KitValue $_ 'Sha256' '') }).Count -gt 0) }
     return $false
 }

@@ -376,22 +376,23 @@ try {
         }
     }
 
-    # Clé Windows préparée depuis Linux : winget et l'Office Deployment Tool n'existent que sous
-    # Windows, et Authenticode n'y est pas vérifiable. Ces éléments restent au catalogue et sont
-    # installés EN LIGNE sur le poste (winget) ; tout ce qui est vérifiable (ISO, SHA256 publié) va sur la clé.
+    # Clé Windows préparée depuis Linux : les logiciels winget viennent des manifestes publics de winget
+    # (URL de l'éditeur, SHA256 vérifié) et vont sur la clé. Restent installés EN LIGNE sur le poste :
+    # Office (l'Office Deployment Tool n'existe que sous Windows) et les fichiers sans empreinte publiée
+    # (seule la signature Authenticode, invérifiable sous Linux, prouverait leur origine).
     $onTarget = 'à installer en ligne sur le poste (winget) : clé préparée depuis Linux'
     $deferToTarget = {
         param($it)
         if (Test-KitWindows) { return $false }
-        if ($it.Type -in @('Winget', 'Office')) { return $true }
+        if ($it.Type -eq 'Office') { return $true }
         if ($it.Type -eq 'Url') { return (@($it.Files | Where-Object { -not (Get-KitValue $_ 'Sha256' '') }).Count -gt 0) }
         return $false
     }
     if (-not (Test-KitWindows) -and $config.Systeme -eq 'Windows') {
-        Write-KitLog -Level WARN -Message 'Clé Windows préparée depuis Linux : ISO et fichiers à empreinte publiée sur la clé ; les logiciels winget et Office seront installés en ligne par la post-installation (Internet requis sur le poste). Pour une clé 100 % hors ligne, préparez-la depuis Windows.'
+        Write-KitLog -Level WARN -Message 'Clé Windows préparée depuis Linux : ISO et logiciels sur la clé (manifestes winget, SHA256 vérifiés) ; Office et les rares fichiers sans empreinte publiée seront installés en ligne par la post-installation (Internet requis sur le poste pour ceux-là).'
     }
     if (-not $SkipDownload -and (Test-KitWindows) -and @($items | Where-Object { $_.Type -eq 'Winget' }).Count -gt 0 -and -not (Initialize-KitWinget)) {
-        throw "winget est introuvable. Installez « App Installer » depuis le Microsoft Store (ou relancez l'assistant sans droits administrateur), ou utilisez -SkipDownload."
+        Write-KitLog -Level WARN -Message "winget est introuvable : les logiciels sont pris dans les manifestes publics de winget (même source, SHA256 vérifié). Pour winget : « App Installer » du Microsoft Store."
     }
     # ------------------------------------------------------------------ 2. sources
     $phase = 'resolve'

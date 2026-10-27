@@ -220,6 +220,20 @@ Invoke-Essai 'Find-KitChecksum : formats GNU, binaire et BSD' {
     Assert-Vrai ((Find-KitChecksum -Text $txt -Pattern '^Fedora-').Sha256 -eq ('c' * 64)) 'format BSD (minuscules)'
     Assert-Vrai ($null -eq (Find-KitChecksum -Text $txt -Pattern 'debian')) 'absent : $null attendu'
 }
+Invoke-Essai 'Manifeste winget : installeurs, valeurs générales héritées, sous-blocs ignorés' {
+    $y = @(
+        'PackageIdentifier: Editeur.Logiciel', 'Scope: machine', 'InstallerType: wix', 'InstallerSwitches:', '  Silent: /S', 'Installers:',
+        '- Architecture: x64', '  InstallerUrl: https://exemple.org/l-x64.msi', ('  InstallerSha256: ' + ('A' * 64)),
+        '  AppsAndFeaturesEntries:', '  - ProductCode: x', '    UpgradeCode: y', '  InstallerSwitches:', '    Custom: z',
+        '- Architecture: x86', '  InstallerType: nullsoft', '  Scope: user', '  InstallerUrl: https://exemple.org/l-x86.exe', ('  InstallerSha256: ' + ('B' * 64)),
+        'ManifestType: installer'
+    ) -join "`n"
+    $r = ConvertFrom-KitWingetInstallerYaml -Yaml $y
+    Assert-Vrai (@($r).Count -eq 2) "installeurs lus : $(@($r).Count)"
+    Assert-Vrai ($r[0].InstallerType -eq 'wix' -and $r[0].Scope -eq 'machine' -and $r[0].InstallerSha256 -eq ('A' * 64)) 'valeurs générales non héritées'
+    Assert-Vrai ($r[1].InstallerType -eq 'nullsoft' -and $r[1].Scope -eq 'user') 'valeurs propres à l''installeur écrasées'
+    Assert-Vrai (-not $r[0].ContainsKey('ProductCode')) 'sous-bloc lu comme installeur'
+}
 Invoke-Essai 'Format-KitSize lisible' {
     Assert-Vrai ((Format-KitSize (1.5 * 1GB)) -match '1[.,]5') (Format-KitSize (1.5 * 1GB))
 }

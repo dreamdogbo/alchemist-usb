@@ -250,7 +250,7 @@ function vueContenu() {
     const g = el('div', { classe: 'groupe' }, el('div', { classe: 'titre' }, cat, el('span', { classe: 'nb' }, items.length + '')));
     for (const it of items) {
       const badges = [];
-      if (it.SurLePoste) badges.push(el('span', { classe: 'badge alerte', title: 'Depuis Linux, winget et Office ne sont pas disponibles : la post-installation l\'installe en ligne sur le poste.' }, 'installé en ligne sur le poste'));
+      if (it.SurLePoste) badges.push(el('span', { classe: 'badge alerte', title: 'Depuis Linux, cet élément (Office, ou fichier sans empreinte publiée) est installé en ligne par la post-installation.' }, 'installé en ligne sur le poste'));
       if (it.Compat && it.Compat.length && !it.Compat.includes('11')) badges.push(el('span', { classe: 'badge' }, 'Windows ' + it.Compat.join('/')));
       if (it.Mode === 'Manuel') badges.push(el('span', { classe: 'badge' }, 'outil à la demande'));
       g.append(el('div', { classe: 'ligne' }, el('label', {},
@@ -262,7 +262,7 @@ function vueContenu() {
   majTotal();
   const notes = [];
   if (E.etat.hote === 'Linux' && p.Systeme === 'Windows') notes.push(el('div', { classe: 'note alerte' },
-    'Clé Windows préparée depuis Linux : l\'ISO Windows et les fichiers à empreinte publiée vont sur la clé ; les logiciels winget et Office seront installés en ligne par la post-installation (Internet requis sur le poste). Pour une clé 100 % hors ligne, préparez-la depuis Windows.'));
+    'Clé Windows préparée depuis Linux : l\'ISO et les logiciels vont sur la clé (manifestes officiels de winget, SHA256 vérifiés). Seuls Office et les rares fichiers sans empreinte publiée sont installés en ligne par la post-installation.'));
   const langue = p.Langues.length ? el('div', { classe: 'champ' }, el('label', { for: 'langue' }, 'Langue de Windows, d\'Office et du clavier'),
     el('select', { id: 'langue', onchange: e => C.langue = e.target.value }, p.Langues.map(l => el('option', { value: l.Code, selected: l.Code === C.langue ? true : null }, l.Label)))) : null;
   return el('section', { classe: 'carte' },

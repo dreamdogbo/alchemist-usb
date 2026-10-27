@@ -13,8 +13,10 @@ la [gestion sémantique de version](https://semver.org/lang/fr/) (`MAJEUR.MINEUR
   pour installer le poste (`Assistant-Poste-Web.ps1` sous Windows, `assistant-poste.py` sous Linux, Python
   seul). Page locale (127.0.0.1, jeton aléatoire, contrôle de l'hôte). Fenêtres classiques conservées
   (`-Classique`, `--zenity`) et utilisées en repli.
-- **Clé Windows depuis Linux** : ISO officielle Windows 11 / 10 (Fido adapté à Linux) et fichiers à empreinte
-  publiée sur la clé ; logiciels winget et Office installés en ligne par la post-installation.
+- **Clé Windows depuis Linux** : ISO officielle Windows 11 / 10 (Fido adapté à Linux) et **tous les logiciels
+  sur la clé**, pris dans les manifestes publics de winget (URL de l'éditeur, SHA256 vérifié, même choix
+  d'installeur que winget). Seul Office reste installé en ligne (l'Office Deployment Tool n'existe que sous
+  Windows). Sous Windows sans winget, même repli au lieu d'un arrêt.
 - **Clé double système** (« Windows + Linux ») : chaque système trouve sa post-installation sur la clé, y
   compris quand la clé est préparée en deux passes ; fuseau horaire converti pour chacun (Windows / IANA).
 - Activation de Windows avec la licence du PC (clé du fabricant dans le firmware, licence numérique), sans

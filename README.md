@@ -117,9 +117,9 @@ bash creer-cle.sh
 ```
 
 Depuis Linux, on prépare **toutes** les clés : Linux, Windows et double système. Pour une clé Windows,
-l'ISO officielle (Windows 11 ou 10) et les fichiers à empreinte publiée vont sur la clé ; les logiciels winget
-et Office, qui n'existent que sous Windows, sont installés **en ligne** par la post-installation (Internet
-requis sur le poste). Pour une clé Windows 100 % hors ligne, préparez-la depuis Windows.
+l'ISO officielle (Windows 11 ou 10) et **tous les logiciels** vont sur la clé : ils sont pris dans les
+manifestes publics de winget (URL de l'éditeur, SHA256 vérifié). Seul Microsoft 365, dont l'outil de
+téléchargement n'existe que sous Windows, est installé **en ligne** par la post-installation.
 
 ## Sur le poste à installer
 
@@ -265,7 +265,7 @@ Détails : [ROADMAP.md](ROADMAP.md).
 
 - **Fido** : Microsoft bloque parfois les téléchargements automatisés → lien officiel (`-WindowsIsoUrl`, ou champ
   « Lien de l'ISO » de l'assistant) ou ISO déposée dans le cache ; une ISO déjà sur la clé est conservée.
-- **Clé Windows préparée depuis Linux** : logiciels winget et Office installés en ligne sur le poste.
+- **Clé Windows préparée depuis Linux** : Microsoft 365 installé en ligne sur le poste (le reste est sur la clé).
 - **Post-installation Linux** : en ligne (dépôts officiels) ; l'installation hors ligne viendra plus tard.
 - **Compte local Windows hors ligne** : Microsoft durcit l'OOBE ; repli `Maj+F10` → `start ms-cxh:localonly`.
 - La suite **ArtCraft** est encore jeune (versions 0.x) : proposée en option.
@@ -281,7 +281,8 @@ workstation from a single **Ventoy** USB key. Pick the **system**, the **usage**
 **versions**; Alchemist downloads everything from official sources (latest stable, SHA256-verified), can install
 Ventoy itself, and works from **Windows** (`Creer-Cle.bat`) or **Linux** (`creer-cle.sh`) with the **same assistant**
 (a local page opened in the browser), for **Windows, Linux or both on one key**. Windows keys prepared from Windows
-install fully **offline** (prepared from Linux, winget software and Office are installed online on the PC); Linux keys install the stack from official repositories (VS Code, native Docker Engine + Podman Desktop,
+install fully **offline** (prepared from Linux, software comes from the public winget manifests with SHA256 checks;
+only Microsoft 365 is installed online on the PC); Linux keys install the stack from official repositories (VS Code, native Docker Engine + Podman Desktop,
 Trivy, Git/gh, Python/uv, Node.js, Java, .NET, Go, Rust, full desktop Microsoft 365 via LinOffice, ONLYOFFICE…). See [docs/STACK.md](docs/STACK.md).
 Docker Desktop is no longer checked by default (paid licence for public sector and large organisations; extra VM
 on Linux): Podman Desktop drives the native Docker Engine and Podman instead. No activation tools: Windows is activated

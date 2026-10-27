@@ -79,7 +79,7 @@ verifier "Chocolatey téléchargé (SHA256 publié par GitHub vérifié)" sh -c 
 verifier "pack WMF 5.1 téléchargé (empreinte fixée vérifiée)" sh -c "ls '$RACINE_CLE'Windows7/2-WMF51/*.zip"
 verifier "MANIFEST.sha256 : chaque fichier vérifié par sha256sum -c" sh -c "cd '$RACINE_CLE' && sha256sum -c --quiet MANIFEST.sha256"
 verifier "post-installation Windows (assistant universel inclus)" sh -c "test -f '$RACINE_CLE'postinstall/Assistant-Poste-Web.ps1 && test -f '$RACINE_CLE'postinstall/alchemist.html"
-verifier "VS Code et Office au catalogue, installés en ligne sur le poste" python3 -c "
+verifier "VS Code et Office au catalogue (Office installé en ligne sur le poste)" python3 -c "
 import json; c = json.load(open('${RACINE_CLE}postinstall/catalogue.json', encoding='utf-8-sig'))
 n = {i['Name']: i for i in c['Items']}; assert n['VSCode']['WingetId'] and n['Office365']['WingetId'] == 'Microsoft.Office'"
 verifier "image personnelle copiée dans ISO/Personnel" test -f "${RACINE_CLE}ISO/Personnel/Outil-Depannage.iso"
