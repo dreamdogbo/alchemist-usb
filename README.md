@@ -239,6 +239,12 @@ La clé créée par `test-ventoy-reel.sh` démarre réellement, en BIOS comme en
 | --- | --- |
 | ![Démarrage BIOS](docs/demarrage-cle-bios.png) | ![Démarrage UEFI](docs/demarrage-cle-uefi.png) |
 
+Et sur une **vraie clé USB** (Kingston 28,8 Go) préparée depuis Linux pour un poste Windows 11 Développement :
+Ventoy installé par Alchemist, Windows 11 (build 26300) et 35 logiciels vérifiés sur la clé, démarrage contrôlé
+en UEFI :
+
+![Vraie clé : Windows 11 au menu de Ventoy](docs/demarrage-cle-reelle-windows11.png)
+
 ## Versions et méthode de travail
 
 - **Versions** : [SemVer](https://semver.org/lang/fr/), source unique [`VERSION`](VERSION) ;

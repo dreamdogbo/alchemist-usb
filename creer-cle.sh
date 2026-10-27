@@ -5,9 +5,9 @@
 #
 #  Même moteur que sous Windows (Build-Kit.ps1, PowerShell 7). Depuis Linux on prépare :
 #    - une clé LINUX (Ubuntu, Mint, Debian, Fedora + ISO Windows facultative) : complète ;
-#    - une clé WINDOWS (Windows 11 / 10 + post-installation) : ISO officielle et fichiers à
-#      empreinte publiée sur la clé ; les logiciels winget et Office sont installés EN LIGNE par
-#      la post-installation (Internet requis sur le poste). Clé 100 % hors ligne : depuis Windows.
+#    - une clé WINDOWS (Windows 11 / 10 + post-installation) : ISO officielle et logiciels sur la
+#      clé (manifestes publics de winget, SHA256 vérifiés) ; seul Microsoft 365 (et les rares
+#      fichiers sans empreinte publiée) est installé EN LIGNE par la post-installation.
 #
 #  Usage :  bash creer-cle.sh            assistant universel dans le navigateur (même interface que
 #                                       sous Windows) ; repli automatique sur les fenêtres zenity
@@ -103,7 +103,7 @@ for l in "${lignes[@]}"; do
   args+=("$c" "$n" "$cat" "$s Mo")
 done
 texte="Éléments à mettre sur la clé :"
-[ "$systeme" = Windows ] && texte="Éléments de la clé Windows.\nDepuis Linux : l'ISO va sur la clé ; les logiciels (winget, Office) sont installés en ligne sur le poste."
+[ "$systeme" = Windows ] && texte="Éléments de la clé Windows.\nDepuis Linux : l'ISO et les logiciels vont sur la clé ; seul Microsoft 365 est installé en ligne sur le poste."
 versions="$(zenity --list --checklist --title="$TITRE" --width=720 --height=560 --text="$texte" \
   --column="" --column="Élément" --column="Catégorie" --column="Taille" --separator=, "${args[@]}" 2>/dev/null)" || exit 1
 [ -z "$versions" ] && erreur "Cochez au moins un élément."

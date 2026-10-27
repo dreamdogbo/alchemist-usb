@@ -41,9 +41,9 @@ Versions : [SemVer](https://semver.org/lang/fr/). Avancement réel : [CHANGELOG]
       extensions VS Code, liste des logiciels Windows → équivalents Linux proposés automatiquement.
 - [x] Interface graphique unique multiplateforme (interface web locale) pour créer la clé et installer le
       poste ; WinForms et zenity conservés en repli ; la ligne de commande reste identique.
-- [x] Préparer les clés Windows depuis Linux (ISO officielle via Fido ; logiciels winget et Office installés
-      en ligne sur le poste) et les clés double système.
-- [ ] Clés Windows 100 % hors ligne depuis Linux (sources directes des éditeurs, sans winget).
+- [x] Préparer les clés Windows depuis Linux (ISO officielle via Fido ; logiciels sur la clé via les manifestes
+      publics de winget, SHA256 vérifiés) et les clés double système.
+- [ ] Microsoft 365 hors ligne depuis Linux (téléchargement du CDN Office sans l'Office Deployment Tool).
 - [ ] « Compléter la clé » et menu des pilotes dans l'assistant universel (aujourd'hui : fenêtre classique).
 - [ ] Autres langues d'interface (ES, DE, PT, AR…) et traduction des journaux.
 
