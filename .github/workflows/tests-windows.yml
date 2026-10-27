@@ -74,6 +74,9 @@ jobs:
           & V:\postinstall\Install-Poste.ps1 -Logiciels Chocolatey,7Zip,VSCode -SansReglages -Journal $log
           Get-Content -LiteralPath $log -Tail 30
           if (-not (Test-Path "$env:ProgramData\chocolatey\choco.exe")) { throw 'Chocolatey non installé' }
+          if (Select-String -LiteralPath $log -Pattern 'configuration compl\u00e9mentaire en \u00e9chec' -Quiet) { throw 'Action complementaire en echec (voir le journal)' }
+          $vs = Join-Path $env:ProgramFiles 'Microsoft VS Code\bin\code.cmd'
+          if (Test-Path $vs) { $x = & cmd.exe /c "`"$vs`" --list-extensions 2>nul"; $x; if (-not ($x -match 'ms-python.python')) { throw 'Extensions VS Code absentes' } }
           & "$env:ProgramData\chocolatey\choco.exe" --version
 
       - name: Assistant universel de création (Windows PowerShell 5.1)

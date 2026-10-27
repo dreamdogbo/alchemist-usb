@@ -262,10 +262,17 @@ function Invoke-PostAction {
             $ext = @('ms-python.python', 'ms-vscode-remote.remote-containers', 'ms-vscode.powershell', 'editorconfig.editorconfig')
             if ((Get-UICulture).TwoLetterISOLanguageName -eq 'fr') { $ext = @('ms-ceintl.vscode-language-pack-fr') + $ext }
             $faites = @()
-            foreach ($e in $ext) {
-                & $code --install-extension $e --force 2>&1 | Out-Null
-                if ($LASTEXITCODE -eq 0) { $faites += $e }
+            # Windows PowerShell 5.1 : un message sur la sortie d'erreur (avertissement Node.js de VS Code)
+            # deviendrait une erreur bloquante avec ErrorActionPreference = Stop ; seul le code de retour compte
+            $eap = $ErrorActionPreference
+            $ErrorActionPreference = 'Continue'
+            try {
+                foreach ($e in $ext) {
+                    & $code --install-extension $e --force 2>&1 | Out-Null
+                    if ($LASTEXITCODE -eq 0) { $faites += $e }
+                }
             }
+            finally { $ErrorActionPreference = $eap }
             return ("extensions : {0}/{1} installées" -f $faites.Count, $ext.Count)
         }
         'WSLFeatures' {
@@ -331,6 +338,8 @@ function Invoke-ActivationWindows {
     .OUTPUTS
         Hashtable Statut (OK | IGNORÉ), Detail. La clé n'est jamais écrite en clair dans le journal.
     #>
+    # Portée locale : la sortie d'erreur de slmgr (2>&1) ne doit pas devenir une erreur bloquante (5.1)
+    $ErrorActionPreference = 'Continue'
     $windowsApp = '55c92734-d682-4d71-983e-d6ec3f16059f'
     $lire = { @(Get-CimInstance -ClassName SoftwareLicensingProduct -Filter "ApplicationID='$windowsApp' AND PartialProductKey IS NOT NULL" -ErrorAction SilentlyContinue) | Select-Object -First 1 }
     $produit = & $lire

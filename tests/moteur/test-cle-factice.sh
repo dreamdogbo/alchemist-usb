@@ -57,6 +57,8 @@ EOF
 chmod +x /usr/local/bin/lsblk
 
 CLE=/media/testeur/Ventoy
+# Disque en boucle toujours détaché, même si le test s'arrête en route (il est global à la machine hôte)
+trap 'umount "$CLE" 2>/dev/null; [ -n "${LOOP:-}" ] && losetup -d "$LOOP" 2>/dev/null' EXIT
 creer_cle() {   # $1 = libellé de la partition de données, $2 = avec VTOYEFI (oui/non)
   umount "$CLE" 2>/dev/null; [ -n "${LOOP:-}" ] && losetup -d "$LOOP" 2>/dev/null
   rm -f /img/cle.img; truncate -s 12G /img/cle.img

@@ -46,6 +46,7 @@ losetup -P "$LOOP" /img/cle.img
     [ "$(stat -c '%t %T' "/dev/$b" 2>/dev/null)" = "$(printf '%x %x' "$ma" "$mi")" ] || { rm -f "/dev/$b"; mknod "/dev/$b" b "$ma" "$mi" 2>/dev/null; }
   done; sleep 0.05; done ) &
 NOEUDS=$!
+trap 'kill "$NOEUDS" 2>/dev/null; umount "${LOOP}p1" 2>/dev/null; losetup -d "$LOOP" 2>/dev/null' EXIT
 
 echo "== Ventoy officiel : téléchargement vérifié et installation sur un disque vierge"
 pwsh -NoProfile -Command "
