@@ -228,7 +228,7 @@ function Invoke-KitVentoy2Disk {
             $code = $LASTEXITCODE
         }
         finally { Pop-Location }
-        foreach ($l in @($out | Select-Object -Last 12)) { Write-KitLog -Message "Ventoy : $l" }
+        foreach ($l in @($out | Select-Object -Last 12)) { Write-KitLog -Message ("Ventoy : {0}" -f ([string]$l -replace '\x1b\[[0-9;]*m', '')) }
         if ($code -ne 0) { throw "Ventoy2Disk.sh a échoué (code $code)." }
     }
     Write-KitLog -Level OK -Message ("Ventoy : {0} terminée ({1})." -f $(if ($Mode -eq 'Install') { 'installation' } else { 'mise à jour' }), $Disk)
@@ -342,7 +342,8 @@ function Wait-KitVentoyVolume {
         }
         else {
             $dev = $(if ($Disk -match '^/dev/') { $Disk } else { "/dev/$Disk" })
-            & udevadm settle 2>$null
+            # udev peut manquer (système minimal) : la boucle d'attente suffit alors
+            if (Get-Command udevadm -ErrorAction SilentlyContinue) { & udevadm settle 2>$null }
             $p = @(Get-KitLinuxBlock | Where-Object { $_.ParentDisk -and $_.ParentDisk.path -eq $dev -and $_.label -eq $Label }) | Select-Object -First 1
             if ($p) {
                 if ($p.mountpoint) { return ($p.mountpoint.TrimEnd('/') + '/') }

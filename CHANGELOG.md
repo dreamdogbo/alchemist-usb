@@ -7,6 +7,39 @@ la [gestion sémantique de version](https://semver.org/lang/fr/) (`MAJEUR.MINEUR
 
 ## [Non publié]
 
+### Ajouté
+
+- **Assistant universel** : même interface sous Windows et Linux, pour créer la clé (`Assistant-Web.ps1`) et
+  pour installer le poste (`Assistant-Poste-Web.ps1` sous Windows, `assistant-poste.py` sous Linux, Python
+  seul). Page locale (127.0.0.1, jeton aléatoire, contrôle de l'hôte). Fenêtres classiques conservées
+  (`-Classique`, `--zenity`) et utilisées en repli.
+- **Clé Windows depuis Linux** : ISO officielle Windows 11 / 10 (Fido adapté à Linux) et fichiers à empreinte
+  publiée sur la clé ; logiciels winget et Office installés en ligne par la post-installation.
+- **Clé double système** (« Windows + Linux ») : chaque système trouve sa post-installation sur la clé, y
+  compris quand la clé est préparée en deux passes ; fuseau horaire converti pour chacun (Windows / IANA).
+- Activation de Windows avec la licence du PC (clé du fabricant dans le firmware, licence numérique), sans
+  échec si aucune licence n'est trouvée.
+- VS Code prêt à l'emploi en mode développement : extensions essentielles installées (Windows et Linux).
+- Repli winget pour Office, Chocolatey, Chocolatey GUI et WSL ; winget réenregistré sur un Windows neuf.
+- Tests : moteur (sans réseau), clé factice de bout en bout, création réelle avec démarrage BIOS/UEFI dans
+  QEMU, post-installation Linux réelle, et workflow « Tests Windows » (clé factice préparée depuis Windows
+  pour chaque destination : Windows, Linux, double système ; installation réelle depuis la clé).
+- Documentation : captures de l'assistant universel et du démarrage réel de la clé (BIOS, UEFI), README,
+  LISEZMOI de la clé, CONTRIBUTING et feuille de route à jour.
+
+### Corrigé
+
+- Budget d'espace : plantage (dépassement d'entier) quand un élément était ignoré faute de place alors qu'il
+  restait plus de 2 Go libres.
+- Catalogue préparé depuis Linux : chemin des outils portables invalide sous Windows (`app\/…`).
+- Post-installation Windows : Office en échec n'essayait pas le repli winget.
+- Linux : `udevadm` absent faisait échouer l'attente de la clé après l'installation de Ventoy.
+- Post-installation Linux : menu `whiptail` affiché dans le journal ; installation sans confirmation quand
+  `whiptail` manquait ; .NET « OK » sans rien installer sur Debian (dépôt Microsoft ajouté) ; LMDE traité comme
+  Ubuntu ; corepack absent des Node.js récents ; colonnes de `--liste` décalées par les accents.
+- `creer-cle.sh` : clé Ventoy non montée ignorée (montée automatiquement), plusieurs clés, chemins avec
+  espaces, terminal Ptyxis (Ubuntu récent).
+
 ## [1.6.0] - 2026-10-14
 
 ### Corrigé

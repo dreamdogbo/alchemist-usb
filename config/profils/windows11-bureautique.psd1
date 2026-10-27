@@ -152,6 +152,8 @@
             # Descripteur de version du Current Channel (CDN Office officiel)
             ChannelCabUrl   = 'https://officecdn.microsoft.com/pr/492350f6-3a01-4f97-b9c0-c7c6ddf67d60/Office/Data/v64.cab'
             ProductId       = 'O365ProPlusRetail'
+            # Repli en ligne sur le poste (Office absent de la clé, ou clé préparée depuis Linux)
+            WingetId        = 'Microsoft.Office'
             Signer          = 'Microsoft Corporation'
             Detection       = 'c2r:O365ProPlusRetail'
             Order           = 30
@@ -292,7 +294,7 @@
         @{
             # Chocolatey : gestionnaire de paquets (MSI officiel, installation hors ligne)
             Name = 'Chocolatey'; Category = 'Gestion de paquets'; Type = 'GitHub'; Priority = 5; TargetDir = 'Logiciels/Chocolatey'
-            Repo = 'chocolatey/choco'; AssetPattern = '^chocolatey-[\d.]+\.msi$'; EstimatedSizeMB = 7
+            Repo = 'chocolatey/choco'; AssetPattern = '^chocolatey-[\d.]+\.msi$'; EstimatedSizeMB = 7; WingetId = 'Chocolatey.Chocolatey'
             Signer = 'Chocolatey'
             SilentArgs = '/qn /norestart'; SuccessCodes = @(0, 3010, 1641)
             Detection = 'file:%ProgramData%\chocolatey\choco.exe'; Order = 60
@@ -300,7 +302,7 @@
         @{
             # Chocolatey GUI : interface graphique de Chocolatey (après Chocolatey)
             Name = 'ChocolateyGUI'; Category = 'Gestion de paquets'; Type = 'GitHub'; Priority = 5; TargetDir = 'Logiciels/ChocolateyGUI'
-            Repo = 'chocolatey/ChocolateyGUI'; AssetPattern = '^ChocolateyGUI\.msi$'; EstimatedSizeMB = 21
+            Repo = 'chocolatey/ChocolateyGUI'; AssetPattern = '^ChocolateyGUI\.msi$'; EstimatedSizeMB = 21; WingetId = 'Chocolatey.ChocolateyGUI'
             Signer = 'Chocolatey'
             SilentArgs = '/qn /norestart'; SuccessCodes = @(0, 3010, 1641)
             Detection = 'reg:^Chocolatey GUI'; Order = 61

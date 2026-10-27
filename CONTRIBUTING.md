@@ -56,11 +56,18 @@ Exemple : `feat(profil): ajouter le profil développement`.
 4. Fichiers `.ps1/.psm1/.psd1` en **UTF-8 avec BOM** (sinon les accents sont abîmés sous 5.1).
 5. `Invoke-ScriptAnalyzer -Settings PSScriptAnalyzerSettings.psd1` sans erreur ni avertissement.
 6. Ne jamais formater / repartitionner la clé ; ne toucher qu'aux fichiers listés dans le MANIFEST.
-7. Tester au minimum `./Build-Kit.ps1 -DryRun` ; pour l'interface, `-TestSansAffichage -Capture <png>`.
-8. Scripts Linux : `shellcheck -S warning` sans remarque ; la simulation multi-distributions tourne dans
-   GitHub Actions (`tests-linux.yml`) — inutile de télécharger des images Docker sur votre poste.
-9. Composant Linux : prévoir les deux familles (`paquets "noms apt" "noms dnf"`).
-10. GitHub Actions : épingler chaque action par **SHA de commit complet**, version en commentaire
+7. Tester au minimum `./tests/moteur/Test-Moteur.ps1` (sans réseau, Windows 5.1 / 7 et Linux) et
+   `./Build-Kit.ps1 -DryRun` ; fenêtre classique : `-TestSansAffichage -Capture <png>`.
+8. Scripts Linux : `shellcheck -S warning` sans remarque. Avec Docker : `bash tests/moteur/test-cle-factice.sh`
+   (clé factice, assistants universels), `bash tests/moteur/test-ventoy-reel.sh` (création réelle et démarrage
+   BIOS/UEFI dans QEMU), `bash tests/linux/test-installation-reelle.sh` (post-installation réelle). GitHub
+   Actions exécute la clé factice (`tests-linux.yml`) et les essais sous Windows pour chaque destination
+   (`tests-windows.yml`) ; les deux tests réels se lancent à la main (plusieurs centaines de Mo téléchargés).
+9. Assistant universel (`web/alchemist.html`) : une seule page pour les deux systèmes ; toute nouvelle route
+   d'API est ajoutée aux trois serveurs (`Assistant-Web.ps1`, `Assistant-Poste-Web.ps1`, `assistant-poste.py`)
+   et protégée par le jeton.
+10. Composant Linux : prévoir les deux familles (`paquets "noms apt" "noms dnf"`).
+11. GitHub Actions : épingler chaque action par **SHA de commit complet**, version en commentaire
     (`uses: owner/action@<sha> # vX.Y.Z`) ; une étiquette peut être déplacée vers un code malveillant.
     Dependabot (`.github/dependabot.yml`) propose chaque lundi une PR groupée avec les nouveaux SHA :
     vérifier les notes de version des actions avant de la fusionner.

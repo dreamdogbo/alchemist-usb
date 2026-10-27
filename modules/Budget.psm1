@@ -89,7 +89,7 @@ function Select-KitBudget {
                 else {
                     $p.Decision = 'IGNORÉ'
                     $p.Detail = ("Place insuffisante : besoin {0}, disponible {1} (marge déduite)" -f
-                        (Format-KitSize $need), (Format-KitSize ([math]::Max(0, $available))))
+                        (Format-KitSize $need), (Format-KitSize ([math]::Max([double]0, $available))))
                 }
             }
         }

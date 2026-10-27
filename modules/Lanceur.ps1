@@ -18,7 +18,9 @@
 [CmdletBinding()]
 param(
     # Affiche les erreurs dans la console au lieu d'une boîte de dialogue (dépannage)
-    [switch] $Console
+    [switch] $Console,
+    # Fenêtre classique (WinForms) au lieu de l'assistant universel dans le navigateur
+    [switch] $Classique
 )
 
 $ErrorActionPreference = 'Stop'
@@ -92,6 +94,12 @@ $mutex = New-Object System.Threading.Mutex($false, 'Local\Alchemist-Assistant')
 $owned = $false
 try { $owned = $mutex.WaitOne(0) } catch [System.Threading.AbandonedMutexException] { $owned = $true }
 if (-not $owned) {
+    # Assistant universel déjà lancé (onglet fermé entre-temps) : on rouvre simplement sa page
+    $openUrl = Join-Path $kitRoot 'logs\assistant-ouvert.url'
+    if (-not $Classique -and (Test-Path -LiteralPath $openUrl)) {
+        $u = (Get-Content -LiteralPath $openUrl -Raw).Trim()
+        if ($u -match '^http://127\.0\.0\.1:\d+/#[0-9a-f]+$') { Start-Process -FilePath $u; $mutex.Dispose(); exit 0 }
+    }
     $msg = $(if ($fr) { "L'assistant Alchemist est déjà ouvert (regardez dans la barre des tâches).`n`nSa fenêtre peut mettre quelques secondes à apparaître." } else { "The Alchemist assistant is already open (check the taskbar).`n`nIts window may take a few seconds to appear." })
     if ($Console) { Write-Host $msg -ForegroundColor Yellow }
     else {
@@ -104,7 +112,15 @@ if (-not $owned) {
 # --------------------------------------------------------------------------- assistant
 $code = 0
 try {
-    & (Join-Path $kitRoot 'Assistant.ps1')
+    # Assistant universel (même page sous Windows et Linux) ; fenêtre classique en repli
+    if ($Classique) { & (Join-Path $kitRoot 'Assistant.ps1') }
+    else {
+        try { & (Join-Path $kitRoot 'Assistant-Web.ps1') }
+        catch {
+            Write-Verbose ('Assistant universel indisponible ({0}) : fenêtre classique.' -f $_.Exception.Message)
+            & (Join-Path $kitRoot 'Assistant.ps1')
+        }
+    }
 }
 catch {
     $code = 1

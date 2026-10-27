@@ -803,11 +803,29 @@ function Get-KitWindowsIsoUrl {
         [Parameter(Mandatory)] [string] $FidoPath
     )
     $last = ''
+    # Linux : Fido refuse les plateformes autres que Windows (choix de l'auteur, pas une limite de l'API
+    # Microsoft) et lit l'architecture par WMI. Copie adaptée (GPLv3) : version de Windows simulée et
+    # architecture x64 fournie ; le lien obtenu reste contrôlé (domaine microsoft.com obligatoire).
+    $linuxPrefix = ''
+    if (-not (Test-KitWindows)) {
+        $src = [IO.File]::ReadAllText($FidoPath)
+        if ($src -match '(?m)^\$winver = Get-Platform-Version\s*$') {
+            $FidoPath = Join-Path (Split-Path -Parent $FidoPath) 'Fido-linux.ps1'
+            [IO.File]::WriteAllText($FidoPath, ($src -replace '(?m)^\$winver = Get-Platform-Version\s*$', '$winver = 10.0'), (New-Object Text.UTF8Encoding($true)))
+            $linuxPrefix = 'function global:Get-CimInstance { param([string] $ClassName) [pscustomobject]@{ Architecture = 9 } }; '
+        }
+    }
     for ($attempt = 1; $attempt -le $script:MaxAttempts; $attempt++) {
-        $psHost = $(if (Test-KitWindows) { 'powershell.exe' } else { (Get-Process -Id $PID).Path })
-        $out = & $psHost -NoProfile -ExecutionPolicy Bypass -File $FidoPath `
-            -Win $Item.FidoWin -Rel $Item.FidoRel -Ed $Item.FidoEd -Lang $Item.FidoLang -Arch $Item.FidoArch -GetUrl 2>&1 |
-            ForEach-Object { [string]$_ }
+        if (Test-KitWindows) {
+            $out = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $FidoPath `
+                -Win $Item.FidoWin -Rel $Item.FidoRel -Ed $Item.FidoEd -Lang $Item.FidoLang -Arch $Item.FidoArch -GetUrl 2>&1 |
+                ForEach-Object { [string]$_ }
+        }
+        else {
+            $q = { param($v) "'" + ([string]$v).Replace("'", "''") + "'" }
+            $cmd = $linuxPrefix + ("& {0} -Win {1} -Rel {2} -Ed {3} -Lang {4} -Arch {5} -GetUrl" -f (& $q $FidoPath), (& $q $Item.FidoWin), (& $q $Item.FidoRel), (& $q $Item.FidoEd), (& $q $Item.FidoLang), (& $q $Item.FidoArch))
+            $out = & (Get-Process -Id $PID).Path -NoProfile -Command $cmd 2>&1 | ForEach-Object { [string]$_ }
+        }
         $url = @($out | Where-Object { $_ -match '^https://\S+\.iso' }) | Select-Object -Last 1
         if ($url) {
             $hostName = ([uri]$url).Host

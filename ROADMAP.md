@@ -39,9 +39,12 @@ Versions : [SemVer](https://semver.org/lang/fr/). Avancement réel : [CHANGELOG]
 
 - [ ] **Assistant de migration Windows → Linux** : données utilisateur, navigateurs, clés SSH, `.gitconfig`,
       extensions VS Code, liste des logiciels Windows → équivalents Linux proposés automatiquement.
-- [ ] Interface graphique unique multiplateforme (Avalonia UI ou interface web locale) remplaçant WinForms
-      et zenity ; la ligne de commande reste identique.
-- [ ] Préparer aussi les clés Windows complètes depuis Linux (sources directes sans winget).
+- [x] Interface graphique unique multiplateforme (interface web locale) pour créer la clé et installer le
+      poste ; WinForms et zenity conservés en repli ; la ligne de commande reste identique.
+- [x] Préparer les clés Windows depuis Linux (ISO officielle via Fido ; logiciels winget et Office installés
+      en ligne sur le poste) et les clés double système.
+- [ ] Clés Windows 100 % hors ligne depuis Linux (sources directes des éditeurs, sans winget).
+- [ ] « Compléter la clé » et menu des pilotes dans l'assistant universel (aujourd'hui : fenêtre classique).
 - [ ] Autres langues d'interface (ES, DE, PT, AR…) et traduction des journaux.
 
 ## Idées

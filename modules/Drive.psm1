@@ -49,7 +49,7 @@ function Get-KitLinuxBlock {
         $n | Add-Member -NotePropertyName ParentDisk -NotePropertyValue $parent -Force
         $flat.Add($n)
         $next = $parent
-        if ($n.type -eq 'disk') { $next = $n }
+        if ($n.type -in @('disk', 'loop')) { $next = $n }   # loop : image disque (tests)
         if ($n.PSObject.Properties['children'] -and $n.children) { foreach ($c in @($n.children)) { $stack.Push(@($c, $next)) } }
     }
     # Éléments émis un par un : l'appelant écrit @(Get-KitLinuxBlock). Avec « return , $tableau »,

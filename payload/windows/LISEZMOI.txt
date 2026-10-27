@@ -31,13 +31,17 @@ CONTENU DE LA CLÉ
      Maj+F10, taper  start ms-cxh:localonly  puis Entrée.
 
 ÉTAPE 2 — LOGICIELS ET RÉGLAGES (sur le bureau Windows)
-  1. Ouvrir la clé, dossier postinstall, double-cliquer Lancer.bat, répondre « Oui ».
-  2. La fenêtre montre chaque logiciel : déjà installé / à installer.
-     Cocher ce qu'il faut, indiquer si besoin le nom du poste, cliquer « Installer ».
+  1. Ouvrir la clé, dossier postinstall, double-cliquer Lancer.bat : l'assistant
+     s'ouvre dans le navigateur (même assistant que pour Linux).
+  2. Il montre chaque logiciel : déjà installé / sur la clé / en ligne (winget).
+     Cocher ce qu'il faut, indiquer si besoin le nom du poste, cliquer « Installer »
+     et accepter la demande d'autorisation (droits administrateur).
+     Windows est activé avec la licence du PC s'il en a une (sinon : simple information).
   3. Attendre le message de fin (20 à 40 min avec Office). Ne pas retirer la clé.
   4. Redémarrer le PC.
-  Bouton « Compléter la clé (Internet) » : si un logiciel manque sur la clé et
-  que le PC a Internet, il est téléchargé SUR LA CLÉ pour les prochains postes.
+  Fenêtre classique : Lancer.bat -Classique. Elle propose aussi le bouton
+  « Compléter la clé (Internet) » : si un logiciel manque sur la clé et que le PC
+  a Internet, il est téléchargé SUR LA CLÉ pour les prochains postes.
 
 ÉTAPE 3 — PILOTES (si un périphérique ne fonctionne pas)
   Double-cliquer postinstall\Pilotes.bat (ou bouton « Pilotes » de la fenêtre).

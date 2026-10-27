@@ -11,7 +11,8 @@ STEP 1 — INSTALL LINUX
 STEP 2 — SOFTWARE (on the Linux desktop, with Internet)
   Open the key, folder "linux", right-click → "Open in Terminal", then:
       bash lancer.sh
-  Pick the usage (office / development), check the software, confirm.
+  The assistant opens in the browser (same as on Windows): pick the usage (office /
+  development), check the software, click "Install". Classic windows: bash lancer.sh --zenity
   Without a window:  sudo bash installer-poste.sh -u developpement -y
   Dry run:           bash installer-poste.sh -u developpement -n -y
 
